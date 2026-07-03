@@ -79,6 +79,9 @@ Supported styles:
 
 No style means `random`
 
+Random chooses from all supported styles except `static`; use `static`
+explicitly for the static welcome card
+
 ## Library Examples
 
 Render one frame without alternate-screen mode:

@@ -10,8 +10,18 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 pub const STATIC_STYLE: &str = "static";
 pub const LOGO_STYLE: &str = "logo";
-pub const SCREEN_RANDOM_STYLES: &[&str] = &[
+pub const SCREEN_STYLES: &[&str] = &[
     STATIC_STYLE,
+    LOGO_STYLE,
+    "boids",
+    "boids_predator",
+    "boids_schools",
+    MANDELBROT_STYLE,
+    "game_of_life_gliders",
+    "game_of_life_oscillators",
+    "game_of_life_bloom",
+];
+pub const SCREEN_RANDOM_STYLES: &[&str] = &[
     LOGO_STYLE,
     "boids",
     "boids_predator",
@@ -138,7 +148,7 @@ fn print_screen_help(command_name: &str) {
     println!("  {command_name} [STYLE] [--cell-style full_block|dotted] [--duration-seconds N]");
     println!();
     println!("Styles:");
-    for style in SCREEN_RANDOM_STYLES {
+    for style in SCREEN_STYLES {
         println!("  {style}");
     }
     println!("  random");
@@ -569,9 +579,9 @@ mod tests {
 
     // Test lane: default
 
-    // Defends: the product random pool is fixed and includes the static welcome card plus every supported screen style.
+    // Defends: explicit style support is broader than the random pool.
     #[test]
-    fn random_pool_includes_static_and_screen_styles() {
+    fn supported_styles_include_static_and_screen_styles() {
         for expected in [
             "static",
             "logo",
@@ -583,8 +593,18 @@ mod tests {
             "game_of_life_oscillators",
             "game_of_life_bloom",
         ] {
-            assert!(SCREEN_RANDOM_STYLES.contains(&expected));
+            assert!(SCREEN_STYLES.contains(&expected));
             assert!(resolve_style(expected, None, "yzs").is_ok());
+        }
+    }
+
+    // Defends: random welcome avoids the static card while keeping it explicitly selectable.
+    #[test]
+    fn random_pool_skips_static() {
+        assert!(!SCREEN_RANDOM_STYLES.contains(&"static"));
+        assert!(resolve_style("static", None, "yzs").is_ok());
+        for index in 0..SCREEN_RANDOM_STYLES.len() * 2 {
+            assert_ne!(random_screen_style(Some(index)), "static");
         }
     }
 
