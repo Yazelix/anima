@@ -22,7 +22,6 @@ pub const SCREEN_STYLES: &[&str] = &[
     "game_of_life_bloom",
 ];
 pub const SCREEN_RANDOM_STYLES: &[&str] = &[
-    LOGO_STYLE,
     "boids",
     "boids_predator",
     "boids_schools",
@@ -598,13 +597,16 @@ mod tests {
         }
     }
 
-    // Defends: random welcome avoids the static card while keeping it explicitly selectable.
+    // Defends: random welcome avoids card-like styles while keeping them explicitly selectable.
     #[test]
-    fn random_pool_skips_static() {
+    fn random_pool_skips_static_and_logo() {
         assert!(!SCREEN_RANDOM_STYLES.contains(&"static"));
+        assert!(!SCREEN_RANDOM_STYLES.contains(&"logo"));
         assert!(resolve_style("static", None, "yzs").is_ok());
+        assert!(resolve_style("logo", None, "yzs").is_ok());
         for index in 0..SCREEN_RANDOM_STYLES.len() * 2 {
             assert_ne!(random_screen_style(Some(index)), "static");
+            assert_ne!(random_screen_style(Some(index)), "logo");
         }
     }
 

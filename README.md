@@ -79,8 +79,8 @@ Supported styles:
 
 No style means `random`
 
-Random chooses from all supported styles except `static`; use `static`
-explicitly for the static welcome card
+Random chooses from the animated styles, excluding `static` and `logo`; use
+those styles explicitly for the card-like welcome screens
 
 ## Library Examples
 
