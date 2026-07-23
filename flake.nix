@@ -29,23 +29,22 @@
       ];
       forAllSystems = nixpkgs.lib.genAttrs systems;
       mkPkgs = system: nixpkgs.legacyPackages.${system};
-      asciiquariumPackage = pkgs:
-        pkgs.rustPlatform.buildRustPackage {
-          pname = "asciiquarium-rs";
-          version = "0.1.1-dev";
-          src = asciiquarium;
-          cargoLock.lockFile = "${asciiquarium}/Cargo.lock";
-
-          meta = {
-            description = "Aquarium animation in ASCII art";
-            homepage = "https://github.com/cablehead/asciiquarium-rs";
-            license = pkgs.lib.licenses.gpl2Plus;
-            mainProgram = "asciiquarium-rs";
-          };
-        };
       yzsPackage =
-        system: pkgs: aquarium:
+        system: pkgs:
         let
+          aquarium = pkgs.rustPlatform.buildRustPackage {
+            pname = "asciiquarium-rs";
+            version = "0.1.1-dev";
+            src = asciiquarium;
+            cargoLock.lockFile = "${asciiquarium}/Cargo.lock";
+
+            meta = {
+              description = "Aquarium animation in ASCII art";
+              homepage = "https://github.com/cablehead/asciiquarium-rs";
+              license = pkgs.lib.licenses.gpl2Plus;
+              mainProgram = "asciiquarium-rs";
+            };
+          };
           rustToolchain = fenix.packages.${system}.combine [
             fenix.packages.${system}.stable.cargo
             fenix.packages.${system}.stable.rustc
@@ -95,8 +94,7 @@
         system:
         let
           pkgs = mkPkgs system;
-          aquarium = asciiquariumPackage pkgs;
-          yzs = yzsPackage system pkgs aquarium;
+          yzs = yzsPackage system pkgs;
         in
         {
           default = yzs;

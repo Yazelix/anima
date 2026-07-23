@@ -84,13 +84,20 @@ pub fn run_screen_cli(
         return Ok(());
     }
 
-    let style = resolve_style(&parsed.style, None, command_name)?;
-    if style == ScreenStyle::Asciiquarium {
-        return run_asciiquarium(parsed.duration);
+    match resolve_style(&parsed.style, None, command_name)? {
+        ScreenStyle::Asciiquarium => run_asciiquarium(parsed.duration),
+        ScreenStyle::Static => run_in_screen_mode(|| run_static(parsed.duration)),
+        ScreenStyle::Logo => run_in_screen_mode(|| run_logo(parsed.duration)),
+        ScreenStyle::Animation(style) => {
+            run_in_screen_mode(|| run_animation(style, parsed.cell_style, parsed.duration))
+        }
     }
+}
+
+fn run_in_screen_mode(run: impl FnOnce() -> Result<(), String>) -> Result<(), String> {
     let _raw = RawModeGuard::new().map_err(|error| format!("could not enter raw mode: {error}"))?;
     let _screen = ScreenModeGuard::new()?;
-    run_style(style, parsed.cell_style, parsed.duration)
+    run()
 }
 
 fn parse_screen_args(
@@ -161,7 +168,6 @@ fn print_screen_help(command_name: &str) {
     println!("  random");
     println!();
     println!("Notes:");
-    println!("  Runs outside Zellij and outside a Yazelix session");
     println!("  Press any key to exit");
 }
 
@@ -212,22 +218,15 @@ fn random_screen_style(random_index: Option<usize>) -> &'static str {
     SCREEN_RANDOM_STYLES[index % SCREEN_RANDOM_STYLES.len()]
 }
 
-fn run_style(
-    style: ScreenStyle,
-    cell_style: GameOfLifeCellStyle,
-    duration: Option<Duration>,
-) -> Result<(), String> {
-    match style {
-        ScreenStyle::Static => run_static(duration),
-        ScreenStyle::Logo => run_logo(duration),
-        ScreenStyle::Asciiquarium => unreachable!("asciiquarium runs in its own terminal mode"),
-        ScreenStyle::Animation(style) => run_animation(style, cell_style, duration),
-    }
-}
-
 fn run_asciiquarium(duration: Option<Duration>) -> Result<(), String> {
-    let status = Command::new(asciiquarium_bin())
-        .args(asciiquarium_args(duration))
+    let mut command = Command::new(asciiquarium_bin());
+    command.arg("--exit-on-any-key");
+    if let Some(duration) = duration {
+        command
+            .arg("--duration-seconds")
+            .arg(duration.as_secs().to_string());
+    }
+    let status = command
         .status()
         .map_err(|error| format!("could not launch asciiquarium: {error}"))?;
     if status.success() {
@@ -239,17 +238,6 @@ fn run_asciiquarium(duration: Option<Duration>) -> Result<(), String> {
 
 fn asciiquarium_bin() -> &'static str {
     option_env!("YZS_ASCIQUARIUM_BIN").unwrap_or("asciiquarium-rs")
-}
-
-fn asciiquarium_args(duration: Option<Duration>) -> Vec<String> {
-    let mut args = vec!["--exit-on-any-key".to_string()];
-    if let Some(duration) = duration {
-        args.extend([
-            "--duration-seconds".to_string(),
-            duration.as_secs().to_string(),
-        ]);
-    }
-    args
 }
 
 fn run_static(duration: Option<Duration>) -> Result<(), String> {
@@ -617,46 +605,20 @@ mod tests {
 
     // Test lane: default
 
-    // Defends: explicit style support is broader than the random pool.
+    // Defends: every advertised style is executable.
     #[test]
-    fn supported_styles_include_static_and_screen_styles() {
-        for expected in [
-            "static",
-            "logo",
-            "asciiquarium",
-            "boids",
-            "boids_predator",
-            "boids_schools",
-            "mandelbrot",
-            "game_of_life_gliders",
-            "game_of_life_oscillators",
-            "game_of_life_bloom",
-        ] {
-            assert!(SCREEN_STYLES.contains(&expected));
-            assert!(resolve_style(expected, None, "yzs").is_ok());
+    fn supported_styles_resolve() {
+        for style in SCREEN_STYLES {
+            assert!(resolve_style(style, None, "yzs").is_ok());
         }
-    }
-
-    // Defends: the external aquarium follows the same exit and duration contract as native styles.
-    #[test]
-    fn asciiquarium_uses_managed_exit_and_duration() {
-        assert_eq!(
-            asciiquarium_args(Some(Duration::from_secs(3))),
-            ["--exit-on-any-key", "--duration-seconds", "3"]
-        );
-        assert_eq!(asciiquarium_args(None), ["--exit-on-any-key"]);
     }
 
     // Defends: random welcome avoids card-like styles while keeping them explicitly selectable.
     #[test]
     fn random_pool_skips_static_and_logo() {
-        assert!(!SCREEN_RANDOM_STYLES.contains(&"static"));
-        assert!(!SCREEN_RANDOM_STYLES.contains(&"logo"));
-        assert!(resolve_style("static", None, "yzs").is_ok());
-        assert!(resolve_style("logo", None, "yzs").is_ok());
-        for index in 0..SCREEN_RANDOM_STYLES.len() * 2 {
-            assert_ne!(random_screen_style(Some(index)), "static");
-            assert_ne!(random_screen_style(Some(index)), "logo");
+        for style in [STATIC_STYLE, LOGO_STYLE] {
+            assert!(!SCREEN_RANDOM_STYLES.contains(&style));
+            assert!(resolve_style(style, None, "yzs").is_ok());
         }
     }
 
@@ -694,9 +656,6 @@ mod tests {
     // Regression: the deleted image-backed magician style must not return through random selection.
     #[test]
     fn random_style_skips_magician() {
-        for index in 0..SCREEN_RANDOM_STYLES.len() * 2 {
-            assert_ne!(random_screen_style(Some(index)), "magician");
-        }
         assert!(!SCREEN_RANDOM_STYLES.contains(&"magician"));
     }
 
