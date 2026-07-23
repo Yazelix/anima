@@ -4,7 +4,7 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     asciiquarium = {
-      url = "github:luccahuguet/asciiquarium-rs/1360282f90a3abd5a3edca030b48f129ae2ba518";
+      url = "github:luccahuguet/asciiquarium-rs/c78b76e84cd2c8b0e2f3b4e817e9cb90aee768a2";
       flake = false;
     };
     fenix = {

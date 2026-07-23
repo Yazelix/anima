@@ -35,7 +35,7 @@ pub const SCREEN_RANDOM_STYLES: &[&str] = &[
     "game_of_life_bloom",
 ];
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy)]
 enum ScreenStyle {
     Static,
     Logo,
@@ -43,7 +43,7 @@ enum ScreenStyle {
     Animation(AnimationStyle),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy)]
 enum AnimationStyle {
     Boids(BoidsVariant),
     GameOfLife(&'static str),
@@ -219,7 +219,7 @@ fn random_screen_style(random_index: Option<usize>) -> &'static str {
 }
 
 fn run_asciiquarium(duration: Option<Duration>) -> Result<(), String> {
-    let mut command = Command::new(asciiquarium_bin());
+    let mut command = Command::new(option_env!("YZS_ASCIQUARIUM_BIN").unwrap_or("asciiquarium-rs"));
     command.arg("--exit-on-any-key");
     if let Some(duration) = duration {
         command
@@ -234,10 +234,6 @@ fn run_asciiquarium(duration: Option<Duration>) -> Result<(), String> {
     } else {
         Err(format!("asciiquarium exited with {status}"))
     }
-}
-
-fn asciiquarium_bin() -> &'static str {
-    option_env!("YZS_ASCIQUARIUM_BIN").unwrap_or("asciiquarium-rs")
 }
 
 fn run_static(duration: Option<Duration>) -> Result<(), String> {
