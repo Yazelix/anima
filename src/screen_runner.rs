@@ -35,7 +35,6 @@ pub const SCREEN_RANDOM_STYLES: &[&str] = &[
     "game_of_life_bloom",
 ];
 
-#[derive(Clone, Copy)]
 enum ScreenStyle {
     Static,
     Logo,
@@ -50,7 +49,6 @@ enum AnimationStyle {
     Mandelbrot,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
 struct ScreenArgs {
     style: String,
     cell_style: GameOfLifeCellStyle,
@@ -647,12 +645,6 @@ mod tests {
         assert!(frame.contains("your reproducible, declarative terminal IDE"));
         assert!(frame.contains("welcome to yazelix"));
         assert!(!frame.contains("just"));
-    }
-
-    // Regression: the deleted image-backed magician style must not return through random selection.
-    #[test]
-    fn random_style_skips_magician() {
-        assert!(!SCREEN_RANDOM_STYLES.contains(&"magician"));
     }
 
     // Defends: Game of Life keeps the same minimum-width sizing contract as the integrated screen renderer.

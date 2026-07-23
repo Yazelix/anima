@@ -7,7 +7,7 @@ use crossterm::{
         LeaveAlternateScreen,
     },
 };
-use std::io::{self, Write};
+use std::io;
 
 fn command_string(write_commands: impl FnOnce(&mut Vec<u8>) -> io::Result<()>) -> String {
     crossterm::style::force_color_output(true);
@@ -78,13 +78,14 @@ pub(crate) fn enter_screen_mode() -> io::Result<()> {
         DisableLineWrap,
         Clear(ClearType::All),
         MoveTo(0, 0)
-    )?;
-    stdout.flush()
+    )
+    .inspect_err(|_| {
+        let _ = leave_screen_mode();
+    })
 }
 
 pub(crate) fn leave_screen_mode() -> io::Result<()> {
     crossterm::style::force_color_output(true);
     let mut stdout = io::stdout();
-    execute!(stdout, EnableLineWrap, Show, LeaveAlternateScreen)?;
-    stdout.flush()
+    execute!(stdout, EnableLineWrap, Show, LeaveAlternateScreen)
 }
