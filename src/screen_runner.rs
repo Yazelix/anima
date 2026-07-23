@@ -6,13 +6,16 @@ use crate::{
     render_screen_frame, terminal_height, terminal_width,
 };
 use crossterm::event::{self, Event};
+use std::process::Command;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+pub const ASCIQUARIUM_STYLE: &str = "asciiquarium";
 pub const STATIC_STYLE: &str = "static";
 pub const LOGO_STYLE: &str = "logo";
 pub const SCREEN_STYLES: &[&str] = &[
     STATIC_STYLE,
     LOGO_STYLE,
+    ASCIQUARIUM_STYLE,
     "boids",
     "boids_predator",
     "boids_schools",
@@ -22,6 +25,7 @@ pub const SCREEN_STYLES: &[&str] = &[
     "game_of_life_bloom",
 ];
 pub const SCREEN_RANDOM_STYLES: &[&str] = &[
+    ASCIQUARIUM_STYLE,
     "boids",
     "boids_predator",
     "boids_schools",
@@ -35,6 +39,7 @@ pub const SCREEN_RANDOM_STYLES: &[&str] = &[
 enum ScreenStyle {
     Static,
     Logo,
+    Asciiquarium,
     Animation(AnimationStyle),
 }
 
@@ -80,6 +85,9 @@ pub fn run_screen_cli(
     }
 
     let style = resolve_style(&parsed.style, None, command_name)?;
+    if style == ScreenStyle::Asciiquarium {
+        return run_asciiquarium(parsed.duration);
+    }
     let _raw = RawModeGuard::new().map_err(|error| format!("could not enter raw mode: {error}"))?;
     let _screen = ScreenModeGuard::new()?;
     run_style(style, parsed.cell_style, parsed.duration)
@@ -172,6 +180,9 @@ fn resolve_style(
     if normalized == LOGO_STYLE {
         return Ok(ScreenStyle::Logo);
     }
+    if normalized == ASCIQUARIUM_STYLE {
+        return Ok(ScreenStyle::Asciiquarium);
+    }
     if let Some(variant) = BoidsVariant::from_style_name(&normalized) {
         return Ok(ScreenStyle::Animation(AnimationStyle::Boids(variant)));
     }
@@ -209,8 +220,36 @@ fn run_style(
     match style {
         ScreenStyle::Static => run_static(duration),
         ScreenStyle::Logo => run_logo(duration),
+        ScreenStyle::Asciiquarium => unreachable!("asciiquarium runs in its own terminal mode"),
         ScreenStyle::Animation(style) => run_animation(style, cell_style, duration),
     }
+}
+
+fn run_asciiquarium(duration: Option<Duration>) -> Result<(), String> {
+    let status = Command::new(asciiquarium_bin())
+        .args(asciiquarium_args(duration))
+        .status()
+        .map_err(|error| format!("could not launch asciiquarium: {error}"))?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!("asciiquarium exited with {status}"))
+    }
+}
+
+fn asciiquarium_bin() -> &'static str {
+    option_env!("YZS_ASCIQUARIUM_BIN").unwrap_or("asciiquarium-rs")
+}
+
+fn asciiquarium_args(duration: Option<Duration>) -> Vec<String> {
+    let mut args = vec!["--exit-on-any-key".to_string()];
+    if let Some(duration) = duration {
+        args.extend([
+            "--duration-seconds".to_string(),
+            duration.as_secs().to_string(),
+        ]);
+    }
+    args
 }
 
 fn run_static(duration: Option<Duration>) -> Result<(), String> {
@@ -584,6 +623,7 @@ mod tests {
         for expected in [
             "static",
             "logo",
+            "asciiquarium",
             "boids",
             "boids_predator",
             "boids_schools",
@@ -595,6 +635,16 @@ mod tests {
             assert!(SCREEN_STYLES.contains(&expected));
             assert!(resolve_style(expected, None, "yzs").is_ok());
         }
+    }
+
+    // Defends: the external aquarium follows the same exit and duration contract as native styles.
+    #[test]
+    fn asciiquarium_uses_managed_exit_and_duration() {
+        assert_eq!(
+            asciiquarium_args(Some(Duration::from_secs(3))),
+            ["--exit-on-any-key", "--duration-seconds", "3"]
+        );
+        assert_eq!(asciiquarium_args(None), ["--exit-on-any-key"]);
     }
 
     // Defends: random welcome avoids card-like styles while keeping them explicitly selectable.

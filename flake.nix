@@ -3,6 +3,10 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    asciiquarium = {
+      url = "github:luccahuguet/asciiquarium-rs/1360282f90a3abd5a3edca030b48f129ae2ba518";
+      flake = false;
+    };
     fenix = {
       url = "github:nix-community/fenix";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -13,6 +17,7 @@
     {
       self,
       nixpkgs,
+      asciiquarium,
       fenix,
     }:
     let
@@ -24,8 +29,22 @@
       ];
       forAllSystems = nixpkgs.lib.genAttrs systems;
       mkPkgs = system: nixpkgs.legacyPackages.${system};
+      asciiquariumPackage = pkgs:
+        pkgs.rustPlatform.buildRustPackage {
+          pname = "asciiquarium-rs";
+          version = "0.1.1-dev";
+          src = asciiquarium;
+          cargoLock.lockFile = "${asciiquarium}/Cargo.lock";
+
+          meta = {
+            description = "Aquarium animation in ASCII art";
+            homepage = "https://github.com/cablehead/asciiquarium-rs";
+            license = pkgs.lib.licenses.gpl2Plus;
+            mainProgram = "asciiquarium-rs";
+          };
+        };
       yzsPackage =
-        system: pkgs:
+        system: pkgs: aquarium:
         let
           rustToolchain = fenix.packages.${system}.combine [
             fenix.packages.${system}.stable.cargo
@@ -59,6 +78,7 @@
             "--bin"
             "yzs"
           ];
+          YZS_ASCIQUARIUM_BIN = "${aquarium}/bin/asciiquarium-rs";
 
           doCheck = false;
 
@@ -75,7 +95,8 @@
         system:
         let
           pkgs = mkPkgs system;
-          yzs = yzsPackage system pkgs;
+          aquarium = asciiquariumPackage pkgs;
+          yzs = yzsPackage system pkgs aquarium;
         in
         {
           default = yzs;

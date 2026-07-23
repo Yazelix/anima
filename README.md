@@ -7,6 +7,7 @@ The user-facing command is `yzs`
 ```bash
 nix run github:luccahuguet/yazelix-screen#yzs
 nix run github:luccahuguet/yazelix-screen#yzs -- static
+nix run github:luccahuguet/yazelix-screen#yzs -- asciiquarium --duration-seconds 3
 nix run github:luccahuguet/yazelix-screen#yzs -- mandelbrot
 nix run github:luccahuguet/yazelix-screen#yzs -- game_of_life_bloom --cell-style dotted
 nix run github:luccahuguet/yazelix-screen#yzs -- random --duration-seconds 3
@@ -15,6 +16,7 @@ nix run github:luccahuguet/yazelix-screen#yzs -- random --duration-seconds 3
 ## What It Contains
 
 - Animation engines for Boids, Mandelbrot, and Game of Life
+- The separately packaged `asciiquarium-rs` terminal aquarium
 - Static and logo-style Yazelix welcome screens
 - File-backed Kitty PNG frame sequence rendering
 - Frame production through `ScreenFrameProducer`
@@ -30,6 +32,7 @@ Installed standalone command:
 yzs --help
 yzs
 yzs static
+yzs asciiquarium --duration-seconds 3
 yzs mandelbrot
 yzs game_of_life_bloom --cell-style dotted
 yzs random --duration-seconds 3
@@ -49,10 +52,14 @@ From this repository:
 ```bash
 cargo run --bin yzs -- --help
 cargo run --bin yzs -- static
+cargo run --bin yzs -- asciiquarium --duration-seconds 3
 cargo run --bin yzs -- mandelbrot
 cargo run --bin yzs -- game_of_life_bloom --cell-style dotted
 cargo run --bin yzs -- random --duration-seconds 3
 ```
+
+Source-only Cargo runs resolve `asciiquarium-rs` from `PATH`; Nix runs use the
+pinned packaged executable
 
 With Nix:
 
@@ -60,6 +67,7 @@ With Nix:
 nix build .#yzs
 nix run .#yzs -- --help
 nix run .#yzs -- static
+nix run .#yzs -- asciiquarium --duration-seconds 3
 nix run .#yzs -- mandelbrot
 nix run .#yzs -- random --duration-seconds 3
 ```
@@ -68,6 +76,7 @@ Supported styles:
 
 - `static`
 - `logo`
+- `asciiquarium`
 - `boids`
 - `boids_predator`
 - `boids_schools`
@@ -81,6 +90,12 @@ No style means `random`
 
 Random chooses from the animated styles, excluding `static` and `logo`; use
 those styles explicitly for the card-like welcome screens
+
+The aquarium runs as a separate
+[`asciiquarium-rs`](https://github.com/cablehead/asciiquarium-rs) process under
+its GPL-2.0-or-later license. `yzs` supplies the same any-key exit and optional
+duration contract used by its native styles without copying or linking the
+aquarium implementation
 
 ## Library Examples
 

@@ -35,7 +35,8 @@ pub use random::{
     random_animation_styles, resolve_random_animation_style,
 };
 pub use screen_runner::{
-    LOGO_STYLE, SCREEN_RANDOM_STYLES, SCREEN_STYLES, STATIC_STYLE, run_screen_cli,
+    ASCIQUARIUM_STYLE, LOGO_STYLE, SCREEN_RANDOM_STYLES, SCREEN_STYLES, STATIC_STYLE,
+    run_screen_cli,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
