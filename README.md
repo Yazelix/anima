@@ -59,7 +59,7 @@ cargo run --bin yzs -- random --duration-seconds 3
 ```
 
 Source-only Cargo runs resolve `asciiquarium-rs` from `PATH`; Nix runs use the
-pinned packaged executable
+pinned upstream executable
 
 With Nix:
 
@@ -95,7 +95,8 @@ The aquarium runs as a separate
 [`asciiquarium-rs`](https://github.com/cablehead/asciiquarium-rs) process under
 its GPL-2.0-or-later license. `yzs` supplies the same any-key exit and optional
 duration contract used by its native styles without copying or linking the
-aquarium implementation
+aquarium implementation. The packaged upstream revision exits cleanly when its
+terminal disappears, so closing the containing terminal cannot orphan it
 
 ## Library Examples
 
