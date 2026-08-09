@@ -1,16 +1,17 @@
-# Yazelix Screen
+# Anima
 
-Standalone terminal screen animations from Yazelix
+Anima is a standalone terminal animation toolkit from Yazelix. It works in any
+capable terminal; no Yazelix installation is required.
 
 The user-facing command is `yzs`
 
 ```bash
-nix run github:luccahuguet/yazelix-screen#yzs
-nix run github:luccahuguet/yazelix-screen#yzs -- static
-nix run github:luccahuguet/yazelix-screen#yzs -- asciiquarium --duration-seconds 3
-nix run github:luccahuguet/yazelix-screen#yzs -- mandelbrot
-nix run github:luccahuguet/yazelix-screen#yzs -- game_of_life_bloom --cell-style dotted
-nix run github:luccahuguet/yazelix-screen#yzs -- random --duration-seconds 3
+nix run github:Yazelix/anima#yzs
+nix run github:Yazelix/anima#yzs -- static
+nix run github:Yazelix/anima#yzs -- asciiquarium --duration-seconds 3
+nix run github:Yazelix/anima#yzs -- mandelbrot
+nix run github:Yazelix/anima#yzs -- game_of_life_bloom --cell-style dotted
+nix run github:Yazelix/anima#yzs -- random --duration-seconds 3
 ```
 
 ## What It Contains
@@ -133,7 +134,7 @@ Yazelix consumes this crate for integrated rendering. `yzx screen` is the integr
 
 ## Surfaces
 
-- Product/repository: `yazelix-screen`
+- Product/repository: `anima`
 - Command: `yzs`
 - Rust crate: `yazelix_screen`
 - Integrated Yazelix command: `yzx screen`

@@ -2,14 +2,14 @@
 
 Shared Yazelix agent workflow and release policy live in the main repo:
 
-- https://github.com/luccahuguet/yazelix/blob/main/AGENTS.md
+- https://github.com/Yazelix/nova/blob/main/AGENTS.md
 - In sibling local checkouts, read `../yazelix/AGENTS.md` first
 
-Only Yazelix Screen-specific guidance belongs here.
+Only Anima-specific guidance belongs here.
 
 ## Local Scope
 
-- This repo owns the standalone `yzs` terminal animation engine and Rust crate.
+- This repo owns Anima's standalone `yzs` terminal animation engine and Rust crate.
 - Main Yazelix owns integrated welcome/session policy and the `yzx screen` command surface.
 - Keep renderer behavior usable from a plain terminal without a Yazelix session.
 

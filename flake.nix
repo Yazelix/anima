@@ -1,5 +1,5 @@
 {
-  description = "Standalone terminal screen animations from Yazelix";
+  description = "Anima: standalone terminal animations from Yazelix";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -82,8 +82,8 @@
           doCheck = false;
 
           meta = {
-            description = "Standalone terminal screen animations from Yazelix";
-            homepage = "https://github.com/luccahuguet/yazelix-screen";
+            description = "Anima: standalone terminal animations from Yazelix";
+            homepage = "https://github.com/Yazelix/anima";
             license = pkgs.lib.licenses.asl20;
             mainProgram = "yzs";
           };
