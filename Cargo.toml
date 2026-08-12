@@ -7,6 +7,7 @@ description = "Anima: standalone terminal animations from Yazelix"
 license = "Apache-2.0"
 repository = "https://github.com/Yazelix/anima"
 readme = "README.md"
+include = ["src/**", "examples/**", "Cargo.lock", "README.md", "LICENSE"]
 keywords = ["animation", "terminal", "tui", "yazelix"]
 categories = ["command-line-utilities"]
 

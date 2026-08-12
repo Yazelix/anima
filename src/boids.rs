@@ -1,3 +1,4 @@
+use crate::random::unit_from_seed;
 use crate::{
     GameOfLifeCellStyle, ScreenAnimationContext, ScreenCell, ScreenFrame, ScreenFrameProducer,
 };
@@ -136,14 +137,14 @@ impl ScreenFrameProducer for BoidsAnimation {
         let grid_height = self.grid_height();
         let mut frame = ScreenFrame::new(self.context.inner_width, grid_height);
         for role_pass in [BoidRole::Flock, BoidRole::Predator] {
-            for (index, boid) in self.boids.iter().enumerate() {
+            for boid in &self.boids {
                 if boid.role != role_pass {
                     continue;
                 }
                 let x = wrapped_index(boid.position.x.round(), grid_width);
                 let y = wrapped_index(boid.position.y.round(), grid_height);
                 let sprite = boid_sprite_cells(self.cell_style, boid.role, boid.velocity);
-                let color_x = boid_color_index(index, boid, self.variant);
+                let color_x = boid_color_index(boid, self.variant);
                 let origin_x = x * 2;
                 for cell in sprite {
                     frame.set(
@@ -217,11 +218,6 @@ fn seed_boids(context: ScreenAnimationContext, variant: BoidsVariant) -> Vec<Boi
             }
         })
         .collect()
-}
-
-fn unit_from_seed(seed: &mut u64) -> f64 {
-    *seed = seed.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
-    ((*seed >> 33) as f64) / ((1u64 << 31) as f64)
 }
 
 fn step_boids(boids: &mut [Boid], width: f64, height: f64, variant: BoidsVariant) {
@@ -330,11 +326,10 @@ fn predator_velocity(index: usize, previous: &[Boid]) -> Vec2 {
         .add(desired.sub(predator.velocity).limit(0.28))
 }
 
-fn boid_color_index(_index: usize, boid: &Boid, variant: BoidsVariant) -> usize {
+fn boid_color_index(boid: &Boid, variant: BoidsVariant) -> usize {
     match (variant, boid.role) {
-        (BoidsVariant::Predator, BoidRole::Predator) => 0,
-        (BoidsVariant::Predator, BoidRole::Flock) => 1,
         (_, BoidRole::Predator) => 0,
+        (BoidsVariant::Predator, BoidRole::Flock) => 1,
         (BoidsVariant::Schools, BoidRole::Flock) => 2 + boid.species % 3,
     }
 }
@@ -1106,16 +1101,16 @@ mod tests {
         };
 
         assert_ne!(
-            boid_color_index(0, &predator, BoidsVariant::Predator),
-            boid_color_index(1, &first_school, BoidsVariant::Predator)
+            boid_color_index(&predator, BoidsVariant::Predator),
+            boid_color_index(&first_school, BoidsVariant::Predator)
         );
         assert_eq!(
-            boid_color_index(1, &first_school, BoidsVariant::Predator),
-            boid_color_index(2, &other_prey, BoidsVariant::Predator)
+            boid_color_index(&first_school, BoidsVariant::Predator),
+            boid_color_index(&other_prey, BoidsVariant::Predator)
         );
         assert_ne!(
-            boid_color_index(1, &first_school, BoidsVariant::Schools),
-            boid_color_index(2, &second_school, BoidsVariant::Schools)
+            boid_color_index(&first_school, BoidsVariant::Schools),
+            boid_color_index(&second_school, BoidsVariant::Schools)
         );
     }
 
@@ -1150,7 +1145,7 @@ mod tests {
         assert_painted_boid_frame(&visible, 80, 24);
     }
 
-    // Defends: boids resize through the same frame-producer contract future animations will use.
+    // Defends: boids obey the shared frame-producer resize contract.
     // Strength: defect=2 behavior=2 resilience=2 cost=1 uniqueness=2 total=9/10
     #[test]
     fn boids_resize_preserves_frame_dimensions() {

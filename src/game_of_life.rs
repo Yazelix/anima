@@ -201,6 +201,10 @@ pub fn game_of_life_grid_height(body_height: usize) -> usize {
     body_height.max(3)
 }
 
+fn grid_dimension(dimension: usize) -> i32 {
+    dimension.min(i32::MAX as usize) as i32
+}
+
 fn shape_size(shape: &[(i32, i32)]) -> (i32, i32) {
     let max_x = shape.iter().map(|(x, _)| *x).max().unwrap_or(0);
     let max_y = shape.iter().map(|(_, y)| *y).max().unwrap_or(0);
@@ -209,14 +213,14 @@ fn shape_size(shape: &[(i32, i32)]) -> (i32, i32) {
 
 fn place_shape(
     shape: &[(i32, i32)],
-    width: usize,
-    height: usize,
+    width: i32,
+    height: i32,
     origin_x: i32,
     origin_y: i32,
 ) -> Vec<(i32, i32)> {
     let (shape_width, shape_height) = shape_size(shape);
-    let max_x = (width as i32 - shape_width).max(0);
-    let max_y = (height as i32 - shape_height).max(0);
+    let max_x = (width - shape_width).max(0);
+    let max_y = (height - shape_height).max(0);
     let origin_x = origin_x.clamp(0, max_x);
     let origin_y = origin_y.clamp(0, max_y);
 
@@ -226,7 +230,7 @@ fn place_shape(
         .collect()
 }
 
-fn build_game_of_life_gliders_seed(width: usize, height: usize) -> HashSet<(i32, i32)> {
+fn build_game_of_life_gliders_seed(width: i32, height: i32) -> HashSet<(i32, i32)> {
     let glider_count = if width >= 36 {
         6
     } else if width >= 22 {
@@ -234,19 +238,19 @@ fn build_game_of_life_gliders_seed(width: usize, height: usize) -> HashSet<(i32,
     } else {
         2
     };
-    let right_edge_x = (width as i32 - 5).max(0);
-    let inner_right_x = (width as i32 - 9).max(0);
-    let middle_upper_y = (height as i32 / 2) - 3;
-    let middle_lower_y = (height as i32 / 2) + 1;
+    let right_edge_x = (width - 5).max(0);
+    let inner_right_x = (width - 9).max(0);
+    let middle_upper_y = (height / 2) - 3;
+    let middle_lower_y = (height / 2) + 1;
 
     let placements = if glider_count == 2 {
-        vec![(1, 1), (right_edge_x, height as i32 - 4)]
+        vec![(1, 1), (right_edge_x, height - 4)]
     } else if glider_count == 4 {
         vec![
             (1, 1),
             (right_edge_x, 2),
-            (4, height as i32 - 7),
-            (inner_right_x, height as i32 - 4),
+            (4, height - 7),
+            (inner_right_x, height - 4),
         ]
     } else {
         vec![
@@ -254,8 +258,8 @@ fn build_game_of_life_gliders_seed(width: usize, height: usize) -> HashSet<(i32,
             (right_edge_x, 2),
             (3, middle_upper_y),
             (inner_right_x, middle_lower_y),
-            (5, height as i32 - 7),
-            (right_edge_x, height as i32 - 4),
+            (5, height - 7),
+            (right_edge_x, height - 4),
         ]
     };
 
@@ -265,13 +269,13 @@ fn build_game_of_life_gliders_seed(width: usize, height: usize) -> HashSet<(i32,
         .collect()
 }
 
-fn build_game_of_life_oscillators_seed(width: usize, height: usize) -> HashSet<(i32, i32)> {
+fn build_game_of_life_oscillators_seed(width: i32, height: i32) -> HashSet<(i32, i32)> {
     let placements = vec![
         (BEACON, 1, 1),
-        (BLINKER, (width as i32 / 2) - 1, 1),
-        (TOAD, (width as i32 / 2) - 2, (height as i32 / 2) - 1),
-        (BLINKER, 2, height as i32 - 2),
-        (BEACON, width as i32 - 5, height as i32 - 5),
+        (BLINKER, (width / 2) - 1, 1),
+        (TOAD, (width / 2) - 2, (height / 2) - 1),
+        (BLINKER, 2, height - 2),
+        (BEACON, width - 5, height - 5),
     ];
     placements
         .into_iter()
@@ -279,16 +283,13 @@ fn build_game_of_life_oscillators_seed(width: usize, height: usize) -> HashSet<(
         .collect()
 }
 
-fn build_game_of_life_bloom_seed(width: usize, height: usize) -> HashSet<(i32, i32)> {
+fn build_game_of_life_bloom_seed(width: i32, height: i32) -> HashSet<(i32, i32)> {
+    let lower_y = (i64::from(height) * 2 / 3) as i32 - 1;
     vec![
         (R_PENTOMINO, 1, 1),
-        (ACORN, (width as i32 / 2) - 3, (height as i32 / 3) - 1),
-        (R_PENTOMINO, width as i32 - 4, height as i32 - 4),
-        (
-            R_PENTOMINO,
-            (width as i32 / 2) - 1,
-            ((height as i32 * 2) / 3) - 1,
-        ),
+        (ACORN, (width / 2) - 3, (height / 3) - 1),
+        (R_PENTOMINO, width - 4, height - 4),
+        (R_PENTOMINO, (width / 2) - 1, lower_y),
     ]
     .into_iter()
     .flat_map(|(shape, x, y)| place_shape(shape, width, height, x, y))
@@ -300,8 +301,8 @@ pub fn build_live_game_of_life_seed(
     body_height: usize,
     style: &str,
 ) -> HashSet<(i32, i32)> {
-    let width = game_of_life_grid_width(inner_width);
-    let height = game_of_life_grid_height(body_height);
+    let width = grid_dimension(game_of_life_grid_width(inner_width));
+    let height = grid_dimension(game_of_life_grid_height(body_height));
     match GameOfLifeVariant::from_style_name(style).unwrap_or(GameOfLifeVariant::Bloom) {
         GameOfLifeVariant::Gliders => build_game_of_life_gliders_seed(width, height),
         GameOfLifeVariant::Oscillators => build_game_of_life_oscillators_seed(width, height),
@@ -314,15 +315,25 @@ pub fn step_game_of_life_cells(
     width: usize,
     height: usize,
 ) -> HashSet<(i32, i32)> {
+    if width == 0 || height == 0 {
+        return HashSet::new();
+    }
+
+    let width = grid_dimension(width);
+    let height = grid_dimension(height);
+    let cells = cells
+        .iter()
+        .map(|&(x, y)| (x.rem_euclid(width), y.rem_euclid(height)))
+        .collect::<HashSet<_>>();
     let mut neighbor_counts: HashMap<(i32, i32), usize> = HashMap::new();
-    for &(x, y) in cells {
+    for &(x, y) in &cells {
         for ny in [y - 1, y, y + 1] {
             for nx in [x - 1, x, x + 1] {
                 if nx == x && ny == y {
                     continue;
                 }
-                let wrapped_x = ((nx + width as i32) % width as i32).rem_euclid(width as i32);
-                let wrapped_y = ((ny + height as i32) % height as i32).rem_euclid(height as i32);
+                let wrapped_x = nx.rem_euclid(width);
+                let wrapped_y = ny.rem_euclid(height);
                 *neighbor_counts.entry((wrapped_x, wrapped_y)).or_insert(0) += 1;
             }
         }
@@ -525,7 +536,28 @@ mod tests {
         assert!(!after.contains("welcome to yazelix"));
     }
 
-    // Defends: future screen animations can use a frame-producer contract with deterministic resize and advance behavior.
+    #[test]
+    fn game_of_life_handles_grid_boundaries() {
+        let cells = [(0, 0)].into_iter().collect();
+        assert!(step_game_of_life_cells(&cells, 0, 1).is_empty());
+        assert!(step_game_of_life_cells(&cells, 1, 0).is_empty());
+
+        let seam = [(-1, 1), (0, 1), (-1, 2)].into_iter().collect();
+        assert_eq!(
+            step_game_of_life_cells(&seam, 5, 5),
+            [(4, 1), (0, 1), (4, 2), (0, 2)].into_iter().collect()
+        );
+
+        let extreme = [(i32::MIN, i32::MAX)].into_iter().collect();
+        assert!(step_game_of_life_cells(&extreme, 5, 5).is_empty());
+        assert!(step_game_of_life_cells(&extreme, usize::MAX, usize::MAX).is_empty());
+
+        let seed = build_live_game_of_life_seed(usize::MAX, usize::MAX, "game_of_life_bloom");
+        assert!(!seed.is_empty());
+        assert!(seed.iter().all(|&(x, y)| x >= 0 && y >= 0));
+    }
+
+    // Defends: Game of Life obeys the shared frame-producer resize and advance contract.
     // Strength: defect=2 behavior=2 resilience=2 cost=1 uniqueness=2 total=9/10
     #[test]
     fn game_of_life_animation_uses_frame_producer_resize_contract() {

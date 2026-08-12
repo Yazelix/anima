@@ -1,13 +1,15 @@
+use crate::random::system_random_index;
 use crate::{
     BoidsAnimation, BoidsVariant, GAME_OF_LIFE_RANDOM_STYLES, GameOfLifeAnimation,
-    GameOfLifeCellStyle, MANDELBROT_STYLE, MandelbrotAnimation, RawModeGuard,
-    ScreenAnimationContext, ScreenFrameProducer, center_frame_lines, center_text,
+    GameOfLifeCellStyle, MANDELBROT_STYLE, MATRIX_STYLE, MandelbrotAnimation, MatrixAnimation,
+    RawModeGuard, ScreenAnimationContext, ScreenFrameProducer, center_frame_lines, center_text,
     enter_screen_mode, game_of_life_spec, leave_screen_mode, mandelbrot_frame_delay,
-    render_screen_frame, terminal_height, terminal_width,
+    matrix_frame_delay, render_screen_frame, terminal_height, terminal_width,
 };
 use crossterm::event::{self, Event};
+use std::io::{self, Write};
 use std::process::Command;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 
 pub const ASCIQUARIUM_STYLE: &str = "asciiquarium";
 pub const STATIC_STYLE: &str = "static";
@@ -20,6 +22,7 @@ pub const SCREEN_STYLES: &[&str] = &[
     "boids_predator",
     "boids_schools",
     MANDELBROT_STYLE,
+    MATRIX_STYLE,
     "game_of_life_gliders",
     "game_of_life_oscillators",
     "game_of_life_bloom",
@@ -30,6 +33,7 @@ pub const SCREEN_RANDOM_STYLES: &[&str] = &[
     "boids_predator",
     "boids_schools",
     MANDELBROT_STYLE,
+    MATRIX_STYLE,
     "game_of_life_gliders",
     "game_of_life_oscillators",
     "game_of_life_bloom",
@@ -47,6 +51,7 @@ enum AnimationStyle {
     Boids(BoidsVariant),
     GameOfLife(&'static str),
     Mandelbrot,
+    Matrix,
 }
 
 struct ScreenArgs {
@@ -78,7 +83,7 @@ pub fn run_screen_cli(
 ) -> Result<(), String> {
     let parsed = parse_screen_args(args, command_name)?;
     if parsed.help {
-        print_screen_help(command_name);
+        print_screen_help(command_name)?;
         return Ok(());
     }
 
@@ -153,20 +158,17 @@ fn parse_screen_args(
     })
 }
 
-fn print_screen_help(command_name: &str) {
-    println!("Show Yazelix terminal screen animations");
-    println!();
-    println!("Usage:");
-    println!("  {command_name} [STYLE] [--cell-style full_block|dotted] [--duration-seconds N]");
-    println!();
-    println!("Styles:");
-    for style in SCREEN_STYLES {
-        println!("  {style}");
-    }
-    println!("  random");
-    println!();
-    println!("Notes:");
-    println!("  Press any key to exit");
+fn print_screen_help(command_name: &str) -> Result<(), String> {
+    let help = format!(
+        "Show Yazelix terminal screen animations\n\nUsage:\n  {command_name} [STYLE] [--cell-style full_block|dotted] [--duration-seconds N]\n\nStyles:\n  {}\n  random\n\nNotes:\n  Press any key to exit\n",
+        SCREEN_STYLES.join("\n  ")
+    );
+    let stdout = io::stdout();
+    let mut stdout = stdout.lock();
+    stdout
+        .write_all(help.as_bytes())
+        .and_then(|_| stdout.flush())
+        .map_err(|error| format!("could not write help: {error}"))
 }
 
 fn resolve_style(
@@ -193,6 +195,9 @@ fn resolve_style(
     if normalized == MANDELBROT_STYLE {
         return Ok(ScreenStyle::Animation(AnimationStyle::Mandelbrot));
     }
+    if normalized == MATRIX_STYLE {
+        return Ok(ScreenStyle::Animation(AnimationStyle::Matrix));
+    }
     if let Some(style) = GAME_OF_LIFE_RANDOM_STYLES
         .iter()
         .find(|candidate| **candidate == normalized)
@@ -207,12 +212,7 @@ fn resolve_style(
 }
 
 fn random_screen_style(random_index: Option<usize>) -> &'static str {
-    let index = random_index.unwrap_or_else(|| {
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .subsec_nanos() as usize
-    });
+    let index = random_index.unwrap_or_else(|| system_random_index(SCREEN_RANDOM_STYLES.len()));
     SCREEN_RANDOM_STYLES[index % SCREEN_RANDOM_STYLES.len()]
 }
 
@@ -353,13 +353,16 @@ fn build_animation(
             Box::new(GameOfLifeAnimation::new(style_name, context, cell_style))
         }
         AnimationStyle::Mandelbrot => Box::new(MandelbrotAnimation::new(context)),
+        AnimationStyle::Matrix => Box::new(MatrixAnimation::new(context)),
     }
 }
 
 fn context_for_style(style: AnimationStyle, width: usize, height: usize) -> ScreenAnimationContext {
     match style {
         AnimationStyle::GameOfLife(_) => game_of_life_context(width, height),
-        AnimationStyle::Boids(_) | AnimationStyle::Mandelbrot => full_screen_context(width, height),
+        AnimationStyle::Boids(_) | AnimationStyle::Mandelbrot | AnimationStyle::Matrix => {
+            full_screen_context(width, height)
+        }
     }
 }
 
@@ -387,6 +390,7 @@ fn frame_delay(style: AnimationStyle) -> Duration {
     match style {
         AnimationStyle::Boids(_) => Duration::from_millis(70),
         AnimationStyle::Mandelbrot => mandelbrot_frame_delay(),
+        AnimationStyle::Matrix => matrix_frame_delay(),
         AnimationStyle::GameOfLife(_) => Duration::from_millis(160),
     }
 }
@@ -549,7 +553,7 @@ fn colorize_logo(text: &str) -> String {
 fn colorize_body(text: &str) -> String {
     let mut out = String::new();
     let mut remaining = text;
-    for accent in [
+    let accents = [
         "reproducible",
         "declarative",
         "helix",
@@ -558,12 +562,15 @@ fn colorize_body(text: &str) -> String {
         "shells",
         "packs",
         "SSH",
-    ] {
-        if let Some(index) = remaining.find(accent) {
-            out.push_str(&green(&remaining[..index]));
-            out.push_str(&blue(accent));
-            remaining = &remaining[index + accent.len()..];
-        }
+    ];
+    while let Some((index, accent)) = accents
+        .iter()
+        .filter_map(|&accent| remaining.find(accent).map(|index| (index, accent)))
+        .min_by_key(|(index, _)| *index)
+    {
+        out.push_str(&green(&remaining[..index]));
+        out.push_str(&blue(accent));
+        remaining = &remaining[index + accent.len()..];
     }
     out.push_str(&green(remaining));
     out
@@ -645,6 +652,10 @@ mod tests {
         assert!(frame.contains("your reproducible, declarative terminal IDE"));
         assert!(frame.contains("welcome to yazelix"));
         assert!(!frame.contains("just"));
+
+        let narrow = static_card(20).join("\n");
+        assert!(narrow.contains(&blue("zellij")));
+        assert!(narrow.contains(&blue("helix")));
     }
 
     // Defends: Game of Life keeps the same minimum-width sizing contract as the integrated screen renderer.

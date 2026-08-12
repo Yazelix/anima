@@ -7,52 +7,53 @@ pub const GAME_OF_LIFE_RANDOM_STYLES: &[&str] = &[
 ];
 pub const BOIDS_RANDOM_STYLES: &[&str] = &["boids_predator", "boids_schools"];
 pub const MANDELBROT_STYLE: &str = "mandelbrot";
+const RANDOM_ANIMATION_FAMILIES: &[&[&str]] = &[
+    GAME_OF_LIFE_RANDOM_STYLES,
+    BOIDS_RANDOM_STYLES,
+    &[MANDELBROT_STYLE],
+    &[crate::matrix::MATRIX_STYLE],
+];
 
 pub fn random_animation_slot_count() -> usize {
-    random_animation_family_count()
-        * lcm(
-            GAME_OF_LIFE_RANDOM_STYLES.len(),
-            BOIDS_RANDOM_STYLES.len().max(1),
-        )
+    RANDOM_ANIMATION_FAMILIES.len() * random_animation_subpool_width()
 }
 
 pub fn random_animation_styles() -> Vec<&'static str> {
-    let mut styles = Vec::new();
-    styles.extend_from_slice(GAME_OF_LIFE_RANDOM_STYLES);
-    styles.extend_from_slice(BOIDS_RANDOM_STYLES);
-    styles.push(MANDELBROT_STYLE);
-    styles
+    RANDOM_ANIMATION_FAMILIES
+        .iter()
+        .flat_map(|styles| styles.iter().copied())
+        .collect()
 }
 
 pub fn resolve_random_animation_style(random_index: Option<usize>) -> &'static str {
-    let subpool_width = lcm(
-        GAME_OF_LIFE_RANDOM_STYLES.len(),
-        BOIDS_RANDOM_STYLES.len().max(1),
-    );
-    let family_count = random_animation_family_count();
+    let subpool_width = random_animation_subpool_width();
+    let family_count = RANDOM_ANIMATION_FAMILIES.len();
     let slot_count = family_count * subpool_width;
     let selected = random_index.unwrap_or_else(|| system_random_index(slot_count)) % slot_count;
     let family = selected % family_count;
     let family_index = (selected / family_count) % subpool_width;
+    let styles = RANDOM_ANIMATION_FAMILIES[family];
 
-    match family {
-        0 => GAME_OF_LIFE_RANDOM_STYLES[family_index % GAME_OF_LIFE_RANDOM_STYLES.len()],
-        1 => BOIDS_RANDOM_STYLES[family_index % BOIDS_RANDOM_STYLES.len()],
-        2 => MANDELBROT_STYLE,
-        _ => unreachable!("random animation family count covers all supported families"),
-    }
+    styles[family_index % styles.len()]
 }
 
-fn random_animation_family_count() -> usize {
-    3
+fn random_animation_subpool_width() -> usize {
+    RANDOM_ANIMATION_FAMILIES
+        .iter()
+        .fold(1, |width, styles| lcm(width, styles.len()))
 }
 
-fn system_random_index(max_len: usize) -> usize {
+pub(crate) fn system_random_index(max_len: usize) -> usize {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .subsec_nanos() as usize;
     nanos % max_len.max(1)
+}
+
+pub(crate) fn unit_from_seed(seed: &mut u64) -> f64 {
+    *seed = seed.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
+    ((*seed >> 33) as f64) / ((1u64 << 31) as f64)
 }
 
 fn lcm(left: usize, right: usize) -> usize {
@@ -83,12 +84,14 @@ mod tests {
         let mut game_of_life_count = 0;
         let mut boids_count = 0;
         let mut mandelbrot_count = 0;
+        let mut matrix_count = 0;
 
         for index in 0..random_animation_slot_count() {
             match resolve_random_animation_style(Some(index)) {
                 style if GAME_OF_LIFE_RANDOM_STYLES.contains(&style) => game_of_life_count += 1,
                 style if BOIDS_RANDOM_STYLES.contains(&style) => boids_count += 1,
                 MANDELBROT_STYLE => mandelbrot_count += 1,
+                crate::matrix::MATRIX_STYLE => matrix_count += 1,
                 other => panic!("unexpected random style {other}"),
             }
         }
@@ -96,5 +99,6 @@ mod tests {
         assert_eq!(game_of_life_count, 6);
         assert_eq!(boids_count, 6);
         assert_eq!(mandelbrot_count, 6);
+        assert_eq!(matrix_count, 6);
     }
 }

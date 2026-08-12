@@ -1,5 +1,5 @@
 use crossterm::event::{self, Event};
-use std::io;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
@@ -28,7 +28,7 @@ pub fn kitty_frame_layout(
     edge_inset_rows: usize,
 ) -> KittyFrameLayout {
     let available_rows = height
-        .saturating_sub(edge_inset_rows.saturating_mul(2) + 1)
+        .saturating_sub(edge_inset_rows.saturating_mul(2).saturating_add(1))
         .max(1);
     let available_columns = width
         .saturating_sub(edge_inset_columns.saturating_mul(2))
@@ -47,7 +47,7 @@ pub fn kitty_frame_layout(
 }
 
 pub fn kitty_png_file_command(image_id: u32, columns: usize, rows: usize, path: &Path) -> String {
-    let payload = base64_encode_bytes(path.to_string_lossy().as_bytes());
+    let payload = base64_encode_bytes(path.as_os_str().as_encoded_bytes());
     format!(
         "\u{1b}_Ga=T,f=100,t=f,i={image_id},p=1,c={columns},r={rows},C=1,z=-1,q=2;{payload}\u{1b}\\"
     )
@@ -61,12 +61,15 @@ pub fn kitty_delete_image_command(image_id: u32) -> String {
 }
 
 pub fn cleanup_kitty_image(image_id: u32) -> io::Result<()> {
-    print!(
+    let stdout = io::stdout();
+    let mut stdout = stdout.lock();
+    write!(
+        stdout,
         "{}{}",
         kitty_delete_image_command(image_id),
         crate::terminal_control::clear_screen_sequence()
-    );
-    crate::flush_stdout()
+    )?;
+    stdout.flush()
 }
 
 pub fn draw_kitty_png_frame(
@@ -90,24 +93,29 @@ pub fn draw_kitty_png_frame(
     );
     let frame_path = &sequence.frame_paths[frame_index % sequence.frame_paths.len()];
 
-    print!("{}", crate::terminal_control::clear_screen_sequence());
+    let stdout = io::stdout();
+    let mut stdout = stdout.lock();
+    write!(
+        stdout,
+        "{}",
+        crate::terminal_control::clear_screen_sequence()
+    )?;
     for _ in 0..layout.top_padding {
-        println!();
+        stdout.write_all(b"\r\n")?;
     }
-    if layout.left_padding > 0 {
-        print!("{}", " ".repeat(layout.left_padding));
-    }
-    print!(
+    write!(stdout, "{}", " ".repeat(layout.left_padding))?;
+    write!(
+        stdout,
         "{}",
         kitty_png_file_command(sequence.image_id, layout.columns, layout.rows, frame_path)
-    );
+    )?;
     for _ in 0..layout.rows {
-        println!();
+        stdout.write_all(b"\r\n")?;
     }
     if let Some(attribution) = &sequence.attribution {
-        println!("{}", crate::center_text(attribution, width));
+        write!(stdout, "{}\r\n", crate::center_text(attribution, width))?;
     }
-    crate::flush_stdout()
+    stdout.flush()
 }
 
 pub fn play_kitty_png_frame_sequence(
@@ -117,6 +125,9 @@ pub fn play_kitty_png_frame_sequence(
     terminal_height: impl Fn() -> usize,
 ) -> io::Result<()> {
     let started_at = Instant::now();
+    if sequence.frame_paths.is_empty() {
+        return draw_kitty_png_frame(sequence, terminal_width(), terminal_height(), 0);
+    }
     let mut frame_index = 0usize;
 
     let play_result = loop {
@@ -125,7 +136,11 @@ pub fn play_kitty_png_frame_sequence(
         {
             break Err(error);
         }
-        match poll_for_keypress(sequence.frame_delay) {
+        let Some(delay) = kitty_frame_wait(sequence.frame_delay, duration, started_at.elapsed())
+        else {
+            break Ok(());
+        };
+        match poll_for_keypress(delay) {
             Ok(true) => break Ok(()),
             Ok(false) => {}
             Err(error) => break Err(error),
@@ -133,16 +148,25 @@ pub fn play_kitty_png_frame_sequence(
         frame_index += 1;
 
         if let Some(duration) = duration
-            && started_at.elapsed() >= duration.max(sequence.frame_delay)
+            && started_at.elapsed() >= duration
         {
             break Ok(());
         }
     };
 
-    match (play_result, cleanup_kitty_image(sequence.image_id)) {
-        (Err(error), _) => Err(error),
-        (Ok(()), Err(error)) => Err(error),
-        (Ok(()), Ok(())) => Ok(()),
+    let cleanup_result = cleanup_kitty_image(sequence.image_id);
+    play_result.and(cleanup_result)
+}
+
+fn kitty_frame_wait(
+    frame_delay: Duration,
+    duration: Option<Duration>,
+    elapsed: Duration,
+) -> Option<Duration> {
+    match duration {
+        Some(duration) if elapsed >= duration => None,
+        Some(duration) => Some(frame_delay.min(duration - elapsed)),
+        None => Some(frame_delay),
     }
 }
 
@@ -206,6 +230,15 @@ mod tests {
                 left_padding: 37,
             }
         );
+        assert_eq!(
+            kitty_frame_layout(1, 1, usize::MAX, usize::MAX),
+            KittyFrameLayout {
+                columns: 1,
+                rows: 1,
+                top_padding: 0,
+                left_padding: 0,
+            }
+        );
     }
 
     // Defends: Kitty graphics commands use file-backed PNG placement plus deletion commands that clear both placement and image id.
@@ -219,5 +252,39 @@ mod tests {
         let delete_command = kitty_delete_image_command(123);
         assert!(delete_command.contains("\u{1b}_Ga=d,d=i,i=123,p=1,q=2;\u{1b}\\"));
         assert!(delete_command.contains("\u{1b}_Ga=d,d=I,i=123,q=2;\u{1b}\\"));
+    }
+
+    #[test]
+    fn kitty_frame_wait_honors_duration() {
+        let frame_delay = Duration::from_secs(1);
+
+        assert_eq!(
+            kitty_frame_wait(frame_delay, None, Duration::ZERO),
+            Some(frame_delay)
+        );
+        assert_eq!(
+            kitty_frame_wait(frame_delay, Some(Duration::ZERO), Duration::ZERO),
+            None
+        );
+        assert_eq!(
+            kitty_frame_wait(
+                frame_delay,
+                Some(Duration::from_millis(80)),
+                Duration::from_millis(30),
+            ),
+            Some(Duration::from_millis(50))
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn kitty_file_command_preserves_non_utf8_path_bytes() {
+        use std::ffi::OsString;
+        use std::os::unix::ffi::OsStringExt;
+
+        let path = PathBuf::from(OsString::from_vec(b"/tmp/\xff.png".to_vec()));
+        let command = kitty_png_file_command(123, 80, 40, &path);
+
+        assert!(command.contains("L3RtcC//LnBuZw=="));
     }
 }

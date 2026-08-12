@@ -1,23 +1,19 @@
 use std::{io, thread, time::Duration};
 
 use yazelix_screen::{
-    BoidsAnimation, BoidsVariant, GameOfLifeAnimation, GameOfLifeCellStyle, MandelbrotAnimation,
+    BoidsAnimation, BoidsVariant, GAME_OF_LIFE_RANDOM_STYLES, GameOfLifeAnimation,
+    GameOfLifeCellStyle, MANDELBROT_STYLE, MATRIX_STYLE, MandelbrotAnimation, MatrixAnimation,
     ScreenAnimationContext, ScreenFrameProducer, enter_screen_mode, game_of_life_spec,
-    is_game_of_life_style, leave_screen_mode, mandelbrot_frame_delay, render_screen_frame,
+    leave_screen_mode, mandelbrot_frame_delay, matrix_frame_delay, render_screen_frame,
     terminal_height, terminal_width,
 };
-
-const GAME_OF_LIFE_STYLES: &[&str] = &[
-    "game_of_life_gliders",
-    "game_of_life_oscillators",
-    "game_of_life_bloom",
-];
 
 #[derive(Debug, Clone, Copy)]
 enum ExampleStyle {
     Boids(BoidsVariant),
     GameOfLife(&'static str),
     Mandelbrot,
+    Matrix,
 }
 
 struct ScreenModeGuard;
@@ -37,7 +33,7 @@ impl Drop for ScreenModeGuard {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args().skip(1);
-    let raw_style = args.next().unwrap_or_else(|| "mandelbrot".to_string());
+    let raw_style = args.next().unwrap_or_else(|| MANDELBROT_STYLE.to_string());
     let frame_count = args
         .next()
         .map(|raw| raw.parse::<usize>())
@@ -62,22 +58,24 @@ fn resolve_style(raw: &str) -> Result<ExampleStyle, io::Error> {
     if let Some(variant) = BoidsVariant::from_style_name(&normalized) {
         return Ok(ExampleStyle::Boids(variant));
     }
-    if normalized == "mandelbrot" {
+    if normalized == MANDELBROT_STYLE {
         return Ok(ExampleStyle::Mandelbrot);
     }
-    if is_game_of_life_style(&normalized) {
-        let style = GAME_OF_LIFE_STYLES
-            .iter()
-            .find(|candidate| **candidate == normalized)
-            .copied()
-            .expect("is_game_of_life_style matched a known example style");
+    if normalized == MATRIX_STYLE {
+        return Ok(ExampleStyle::Matrix);
+    }
+    if let Some(style) = GAME_OF_LIFE_RANDOM_STYLES
+        .iter()
+        .find(|candidate| **candidate == normalized)
+        .copied()
+    {
         return Ok(ExampleStyle::GameOfLife(style));
     }
 
     Err(io::Error::new(
         io::ErrorKind::InvalidInput,
         format!(
-            "unsupported style `{normalized}`; expected boids, boids_predator, boids_schools, mandelbrot, game_of_life_gliders, game_of_life_oscillators, or game_of_life_bloom"
+            "unsupported style `{normalized}`; expected boids, boids_predator, boids_schools, mandelbrot, matrix, game_of_life_gliders, game_of_life_oscillators, or game_of_life_bloom"
         ),
     ))
 }
@@ -96,6 +94,7 @@ fn build_animation(style: ExampleStyle) -> Box<dyn ScreenFrameProducer> {
             GameOfLifeCellStyle::FullBlock,
         )),
         ExampleStyle::Mandelbrot => Box::new(MandelbrotAnimation::new(context)),
+        ExampleStyle::Matrix => Box::new(MatrixAnimation::new(context)),
     }
 }
 
@@ -106,7 +105,7 @@ fn context_for_style(style: ExampleStyle, width: usize, height: usize) -> Screen
             let spec = game_of_life_spec(size_class);
             width.saturating_sub(6).max(spec.minimum_inner_width)
         }
-        ExampleStyle::Boids(_) | ExampleStyle::Mandelbrot => width,
+        ExampleStyle::Boids(_) | ExampleStyle::Mandelbrot | ExampleStyle::Matrix => width,
     };
 
     ScreenAnimationContext {
@@ -133,6 +132,7 @@ fn frame_delay(style: ExampleStyle) -> Duration {
     match style {
         ExampleStyle::Boids(_) => Duration::from_millis(70),
         ExampleStyle::Mandelbrot => mandelbrot_frame_delay(),
+        ExampleStyle::Matrix => matrix_frame_delay(),
         ExampleStyle::GameOfLife(_) => Duration::from_millis(160),
     }
 }

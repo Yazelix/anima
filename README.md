@@ -16,7 +16,7 @@ nix run github:Yazelix/anima#yzs -- random --duration-seconds 3
 
 ## What It Contains
 
-- Animation engines for Boids, Mandelbrot, and Game of Life
+- Animation engines for Boids, Mandelbrot, Matrix rain, and Game of Life
 - The separately packaged `asciiquarium-rs` terminal aquarium
 - Static and logo-style Yazelix welcome screens
 - File-backed Kitty PNG frame sequence rendering
@@ -82,6 +82,7 @@ Supported styles:
 - `boids_predator`
 - `boids_schools`
 - `mandelbrot`
+- `matrix`
 - `game_of_life_gliders`
 - `game_of_life_oscillators`
 - `game_of_life_bloom`
@@ -111,6 +112,7 @@ Play a style for a bounded number of frames:
 
 ```bash
 cargo run --example play_style -- mandelbrot 90
+cargo run --example play_style -- matrix 90
 cargo run --example play_style -- boids_schools 120
 cargo run --example play_style -- game_of_life_gliders 80
 ```

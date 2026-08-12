@@ -16,29 +16,25 @@ fn command_string(write_commands: impl FnOnce(&mut Vec<u8>) -> io::Result<()>) -
     String::from_utf8(output).expect("crossterm commands emit UTF-8")
 }
 
-pub(crate) fn styled(text: impl ToString, color: Color) -> String {
+pub(crate) fn styled(text: char, color: Color) -> String {
     command_string(|output| {
         queue!(
             output,
             SetForegroundColor(color),
-            Print(text.to_string()),
+            Print(text),
             SetForegroundColor(Color::Reset)
         )?;
         Ok(())
     })
 }
 
-pub(crate) fn styled_with_background(
-    text: impl ToString,
-    color: Color,
-    background: Color,
-) -> String {
+pub(crate) fn styled_with_background(text: char, color: Color, background: Color) -> String {
     command_string(|output| {
         queue!(
             output,
             SetForegroundColor(color),
             SetBackgroundColor(background),
-            Print(text.to_string()),
+            Print(text),
             SetBackgroundColor(Color::Reset),
             SetForegroundColor(Color::Reset)
         )?;

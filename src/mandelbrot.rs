@@ -92,14 +92,7 @@ impl std::ops::Mul for Complex64 {
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct MandelbrotEscape {
     iterations: usize,
-    normalized_depth: usize,
     distance_estimate: Option<f64>,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-struct MandelbrotSample {
-    escape: MandelbrotEscape,
-    score: f64,
 }
 
 pub fn mandelbrot_escape_iterations(cx: f64, cy: f64, max_iterations: usize) -> usize {
@@ -110,7 +103,6 @@ fn mandelbrot_escape(cx: f64, cy: f64, max_iterations: usize) -> MandelbrotEscap
     if is_known_mandelbrot_interior(cx, cy) {
         return MandelbrotEscape {
             iterations: max_iterations,
-            normalized_depth: max_iterations.saturating_mul(24),
             distance_estimate: None,
         };
     }
@@ -125,7 +117,6 @@ fn mandelbrot_escape(cx: f64, cy: f64, max_iterations: usize) -> MandelbrotEscap
         if magnitude_squared > 4.0 {
             return MandelbrotEscape {
                 iterations: iteration,
-                normalized_depth: continuous_escape_depth(iteration, magnitude_squared),
                 distance_estimate: mandelbrot_distance_estimate(
                     magnitude_squared,
                     derivative_x,
@@ -144,7 +135,6 @@ fn mandelbrot_escape(cx: f64, cy: f64, max_iterations: usize) -> MandelbrotEscap
 
     MandelbrotEscape {
         iterations: max_iterations,
-        normalized_depth: max_iterations.saturating_mul(24),
         distance_estimate: None,
     }
 }
@@ -173,39 +163,25 @@ fn mandelbrot_distance_estimate(
     Some(0.5 * magnitude * magnitude.ln() / derivative_magnitude)
 }
 
-fn continuous_escape_depth(iteration: usize, magnitude_squared: f64) -> usize {
-    let magnitude = magnitude_squared.sqrt().max(2.0);
-    let smooth_iteration = iteration as f64 + 1.0 - magnitude.ln().ln() / std::f64::consts::LN_2;
-    (smooth_iteration.max(0.0) * 24.0).round() as usize
-}
-
 fn render_mandelbrot_frame(context: ScreenAnimationContext, frame_index: usize) -> Vec<String> {
     let width = context.inner_width.max(1);
     let height = context.resolved_height.max(1);
     let view = mandelbrot_view(frame_index);
     let max_iterations = mandelbrot_max_iterations_for_zoom(width, height, view.zoom);
-    let cells = render_mandelbrot_cells(width, height, frame_index, view, max_iterations);
-
     let mut frame = ScreenFrame::new(width, height);
-    for y in 0..height {
-        for x in 0..width {
-            if let Some(cell) = cells[y * width + x] {
-                frame.set(x, y, cell);
-            }
-        }
-    }
+    populate_mandelbrot_frame(&mut frame, width, height, frame_index, view, max_iterations);
 
     frame.render_lines(context.resolved_width, colorize_mandelbrot_cell)
 }
 
-fn render_mandelbrot_cells(
+fn populate_mandelbrot_frame(
+    frame: &mut ScreenFrame,
     width: usize,
     height: usize,
     frame_index: usize,
     view: MandelbrotView,
     max_iterations: usize,
-) -> Vec<Option<ScreenCell>> {
-    let mut cells = vec![None; width.saturating_mul(height)];
+) {
     let portal_progress =
         mandelbrot_recursive_portal_progress(mandelbrot_loop_progress(frame_index));
     let nested_view = mandelbrot_view_for_progress(0.0);
@@ -219,27 +195,27 @@ fn render_mandelbrot_cells(
             if let Some((portal_x, portal_y)) =
                 portal_progress.and_then(|progress| mandelbrot_portal_coordinates(nx, ny, progress))
             {
-                if let Some(sample) = mandelbrot_sample_at(
+                if let Some(cell) = mandelbrot_sample_at(
                     portal_x,
                     portal_y,
                     width,
-                    height,
                     nested_view,
                     nested_max_iterations,
-                ) {
-                    cells[y * width + x] = mandelbrot_cell(sample, nested_view);
+                )
+                .and_then(|score| mandelbrot_cell(score, nested_view))
+                {
+                    frame.set(x, y, cell);
                 }
                 continue;
             }
 
-            if let Some(sample) = mandelbrot_sample_at(nx, ny, width, height, view, max_iterations)
+            if let Some(cell) = mandelbrot_sample_at(nx, ny, width, view, max_iterations)
+                .and_then(|score| mandelbrot_cell(score, view))
             {
-                cells[y * width + x] = mandelbrot_cell(sample, view);
+                frame.set(x, y, cell);
             }
         }
     }
-
-    cells
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -323,10 +299,9 @@ fn mandelbrot_sample_at(
     nx: f64,
     ny: f64,
     width: usize,
-    _height: usize,
     view: MandelbrotView,
     max_iterations: usize,
-) -> Option<MandelbrotSample> {
+) -> Option<f64> {
     let (cx, cy) = mandelbrot_point(nx, ny, view);
     let escape = mandelbrot_escape(cx, cy, max_iterations);
     mandelbrot_sample(escape, max_iterations, view, width)
@@ -362,30 +337,24 @@ fn mandelbrot_sample(
     max_iterations: usize,
     view: MandelbrotView,
     width: usize,
-) -> Option<MandelbrotSample> {
+) -> Option<f64> {
     let iterations = escape.iterations;
-    if iterations <= 1 {
+    if iterations <= 1 || iterations == max_iterations {
         return None;
     }
 
     let pixel_scale = view.scale_x / width.max(1) as f64;
-    let distance_pixels = escape
-        .distance_estimate
-        .map(|distance| distance / pixel_scale.max(f64::MIN_POSITIVE))
-        .unwrap_or(0.0);
+    let distance_pixels = escape.distance_estimate.map_or(0.0, |distance| {
+        distance / pixel_scale.max(f64::MIN_POSITIVE)
+    });
     let boundary_weight = (1.0 / (1.0 + distance_pixels.max(0.0).powf(0.7))).clamp(0.0, 1.0);
     let dwell_weight = (iterations as f64 / max_iterations as f64).powf(0.35);
-    if iterations == max_iterations {
-        return None;
-    }
 
-    let score = boundary_weight * 0.70 + dwell_weight * 0.30;
-
-    Some(MandelbrotSample { escape, score })
+    Some(boundary_weight * 0.70 + dwell_weight * 0.30)
 }
 
-fn mandelbrot_cell(sample: MandelbrotSample, view: MandelbrotView) -> Option<ScreenCell> {
-    let intensity = sample.score.clamp(0.0, 1.0);
+fn mandelbrot_cell(score: f64, view: MandelbrotView) -> Option<ScreenCell> {
+    let intensity = score.clamp(0.0, 1.0);
     let (glyph, intensity_bucket) = if intensity < 0.28 {
         return None;
     } else if intensity < 0.44 {
@@ -410,11 +379,9 @@ fn colorize_mandelbrot_cell(cell: ScreenCell) -> String {
     let phase = cell.color_x % 3;
     let color = match (cell.color_y, phase) {
         (0 | 1, 0) => Color::AnsiValue(33),
-        (0 | 1, _) => Color::AnsiValue(129),
-        (2 | 3, 0) => Color::AnsiValue(129),
-        (2 | 3, _) => Color::AnsiValue(201),
+        (0 | 1, _) | (2 | 3, 0) => Color::AnsiValue(129),
         (4 | 5, 2) => Color::AnsiValue(208),
-        (4 | 5, _) => Color::AnsiValue(201),
+        (2 | 3, _) | (4 | 5, _) => Color::AnsiValue(201),
         (_, 2) => Color::AnsiValue(226),
         _ => Color::AnsiValue(208),
     };

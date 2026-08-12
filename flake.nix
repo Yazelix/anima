@@ -28,7 +28,6 @@
         "aarch64-darwin"
       ];
       forAllSystems = nixpkgs.lib.genAttrs systems;
-      mkPkgs = system: nixpkgs.legacyPackages.${system};
       yzsPackage =
         system: pkgs:
         let
@@ -53,18 +52,15 @@
             cargo = rustToolchain;
             rustc = rustToolchain;
           };
-          source = pkgs.lib.cleanSourceWith {
-            name = "yzs-source";
-            src = ./.;
-            filter =
-              path: _type:
-              let
-                relativePath = pkgs.lib.removePrefix ((toString ./.) + "/") (toString path);
-              in
-              relativePath != "target"
-              && !pkgs.lib.hasPrefix "target/" relativePath
-              && relativePath != ".git"
-              && !pkgs.lib.hasPrefix ".git/" relativePath;
+          source = pkgs.lib.fileset.toSource {
+            root = ./.;
+            fileset = pkgs.lib.fileset.unions [
+              ./Cargo.lock
+              ./Cargo.toml
+              ./LICENSE
+              ./README.md
+              ./src
+            ];
           };
         in
         rustPlatform.buildRustPackage {
@@ -93,7 +89,7 @@
       packages = forAllSystems (
         system:
         let
-          pkgs = mkPkgs system;
+          pkgs = nixpkgs.legacyPackages.${system};
           yzs = yzsPackage system pkgs;
         in
         {
