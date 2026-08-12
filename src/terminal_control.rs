@@ -1,4 +1,5 @@
 use crossterm::{
+    SynchronizedUpdate,
     cursor::{Hide, MoveTo, Show},
     execute, queue,
     style::{Color, Print, SetBackgroundColor, SetForegroundColor},
@@ -7,7 +8,7 @@ use crossterm::{
         LeaveAlternateScreen,
     },
 };
-use std::io;
+use std::io::{self, Write};
 
 fn command_string(write_commands: impl FnOnce(&mut Vec<u8>) -> io::Result<()>) -> String {
     crossterm::style::force_color_output(true);
@@ -55,6 +56,11 @@ pub(crate) fn screen_frame_output(frame: &[String]) -> String {
         }
         Ok(())
     })
+}
+
+pub(crate) fn render_screen_frame(writer: &mut impl Write, frame: &[String]) -> io::Result<()> {
+    let output = screen_frame_output(frame);
+    writer.sync_update(|writer| writer.write_all(output.as_bytes()))?
 }
 
 pub(crate) fn clear_screen_sequence() -> String {

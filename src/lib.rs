@@ -156,8 +156,7 @@ pub fn flush_stdout() -> io::Result<()> {
 pub fn render_screen_frame(frame: &[String]) -> io::Result<()> {
     let stdout = io::stdout();
     let mut stdout = stdout.lock();
-    stdout.write_all(screen_frame_output(frame).as_bytes())?;
-    stdout.flush()
+    terminal_control::render_screen_frame(&mut stdout, frame)
 }
 
 pub fn enter_screen_mode() -> io::Result<()> {
@@ -189,14 +188,25 @@ mod tests {
 
     // Test lane: default
 
-    // Regression: raw alternate-screen rendering must not rely on newlines after full-width lines, which can wrap into every other row.
+    // Regression: one large multi-row frame must stay inside one synchronized update without newline-driven wrapping.
     // Strength: defect=2 behavior=2 resilience=2 cost=1 uniqueness=2 total=9/10
     #[test]
-    fn screen_frame_output_addresses_rows_without_newlines() {
-        let output = screen_frame_output(&["aaaaaaaa".to_string(), "bbbbbbbb".to_string()]);
+    fn render_screen_frame_is_one_synchronized_update() {
+        const BEGIN: &str = "\x1b[?2026h";
+        const END: &str = "\x1b[?2026l";
+        let frame = vec!["a".repeat(4_096), "b".repeat(4_096), "c".to_string()];
+        let mut output = Vec::new();
+
+        terminal_control::render_screen_frame(&mut output, &frame).unwrap();
+
+        let output = String::from_utf8(output).unwrap();
+        assert!(output.len() > 8 * 1_024);
+        assert!(output.starts_with(BEGIN));
+        assert!(output.ends_with(END));
+        assert_eq!(output.matches(BEGIN).count(), 1);
+        assert_eq!(output.matches(END).count(), 1);
         assert!(!output.contains('\n'));
-        assert!(output.contains("aaaaaaaa"));
-        assert!(output.contains("bbbbbbbb"));
-        assert_eq!(visible_line_width(&output), "aaaaaaaabbbbbbbb".len());
+        assert!(output.contains(&frame[0]));
+        assert!(output.contains(&frame[1]));
     }
 }
