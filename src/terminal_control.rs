@@ -2,13 +2,15 @@ use crossterm::{
     SynchronizedUpdate,
     cursor::{Hide, MoveTo, Show},
     execute, queue,
-    style::{Color, Print, SetBackgroundColor, SetForegroundColor},
+    style::{Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor},
     terminal::{
         Clear, ClearType, DisableLineWrap, EnableLineWrap, EnterAlternateScreen,
         LeaveAlternateScreen,
     },
 };
 use std::io::{self, Write};
+
+use crate::RgbColor;
 
 fn command_string(write_commands: impl FnOnce(&mut Vec<u8>) -> io::Result<()>) -> String {
     crossterm::style::force_color_output(true);
@@ -43,15 +45,49 @@ pub(crate) fn styled_with_background(text: char, color: Color, background: Color
     })
 }
 
+pub(crate) fn write_truecolor(
+    output: &mut impl Write,
+    text: char,
+    foreground: RgbColor,
+    background: Option<RgbColor>,
+) -> io::Result<()> {
+    crossterm::style::force_color_output(true);
+    queue!(
+        output,
+        SetForegroundColor(Color::Rgb {
+            r: foreground.red,
+            g: foreground.green,
+            b: foreground.blue
+        })
+    )?;
+    if let Some(color) = background {
+        queue!(
+            output,
+            SetBackgroundColor(Color::Rgb {
+                r: color.red,
+                g: color.green,
+                b: color.blue
+            })
+        )?;
+    }
+    queue!(
+        output,
+        Print(text),
+        SetBackgroundColor(Color::Reset),
+        SetForegroundColor(Color::Reset)
+    )
+}
+
 pub(crate) fn screen_frame_output(frame: &[String]) -> String {
     command_string(|output| {
-        queue!(output, MoveTo(0, 0), Clear(ClearType::All))?;
+        queue!(output, ResetColor, MoveTo(0, 0), Clear(ClearType::All))?;
         for (row_index, line) in frame.iter().enumerate() {
             queue!(
                 output,
                 MoveTo(0, row_index.min(u16::MAX as usize) as u16),
                 Clear(ClearType::CurrentLine),
-                Print(line)
+                Print(line),
+                ResetColor
             )?;
         }
         Ok(())
@@ -65,7 +101,7 @@ pub(crate) fn render_screen_frame(writer: &mut impl Write, frame: &[String]) -> 
 
 pub(crate) fn clear_screen_sequence() -> String {
     command_string(|output| {
-        queue!(output, MoveTo(0, 0), Clear(ClearType::All))?;
+        queue!(output, ResetColor, MoveTo(0, 0), Clear(ClearType::All))?;
         Ok(())
     })
 }
@@ -78,6 +114,7 @@ pub(crate) fn enter_screen_mode() -> io::Result<()> {
         EnterAlternateScreen,
         Hide,
         DisableLineWrap,
+        ResetColor,
         Clear(ClearType::All),
         MoveTo(0, 0)
     )
@@ -89,5 +126,11 @@ pub(crate) fn enter_screen_mode() -> io::Result<()> {
 pub(crate) fn leave_screen_mode() -> io::Result<()> {
     crossterm::style::force_color_output(true);
     let mut stdout = io::stdout();
-    execute!(stdout, EnableLineWrap, Show, LeaveAlternateScreen)
+    execute!(
+        stdout,
+        ResetColor,
+        EnableLineWrap,
+        Show,
+        LeaveAlternateScreen
+    )
 }

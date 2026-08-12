@@ -150,11 +150,11 @@ impl ScreenFrameProducer for BoidsAnimation {
                     frame.set(
                         origin_x + cell.dx,
                         y + cell.dy,
-                        ScreenCell {
-                            glyph: cell.glyph,
+                        ScreenCell::indexed(
+                            cell.glyph,
                             color_x,
-                            color_y: pack_boid_tones(cell.tone, cell.background_tone),
-                        },
+                            pack_boid_tones(cell.tone, cell.background_tone),
+                        ),
                     );
                 }
             }

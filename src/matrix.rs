@@ -56,11 +56,11 @@ impl ScreenFrameProducer for MatrixAnimation {
                     frame.set(
                         x,
                         y as usize,
-                        ScreenCell {
-                            glyph: matrix_glyph(column.glyph_seed, x, y as usize, self.frame_index),
-                            color_x: 0,
-                            color_y: trail_tone(age, column.length),
-                        },
+                        ScreenCell::indexed(
+                            matrix_glyph(column.glyph_seed, x, y as usize, self.frame_index),
+                            0,
+                            trail_tone(age, column.length),
+                        ),
                     );
                 }
             }

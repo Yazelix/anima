@@ -42,10 +42,51 @@ pub use screen_runner::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RgbColor {
+    pub red: u8,
+    pub green: u8,
+    pub blue: u8,
+}
+
+impl RgbColor {
+    pub const fn new(red: u8, green: u8, blue: u8) -> Self {
+        Self { red, green, blue }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ScreenCell {
     pub glyph: char,
     pub color_x: usize,
     pub color_y: usize,
+    foreground: Option<RgbColor>,
+    background: Option<RgbColor>,
+}
+
+impl ScreenCell {
+    pub const fn indexed(glyph: char, color_x: usize, color_y: usize) -> Self {
+        Self {
+            glyph,
+            color_x,
+            color_y,
+            foreground: None,
+            background: None,
+        }
+    }
+
+    pub const fn truecolor(
+        glyph: char,
+        foreground: RgbColor,
+        background: Option<RgbColor>,
+    ) -> Self {
+        Self {
+            glyph,
+            color_x: 0,
+            color_y: 0,
+            foreground: Some(foreground),
+            background,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -77,14 +118,91 @@ impl ScreenFrame {
     {
         let lines = (0..self.height)
             .map(|y| {
-                let mut line = String::new();
+                let mut line = Vec::new();
                 for x in 0..self.width {
                     match self.cells[y * self.width + x] {
-                        Some(cell) => line.push_str(&render_cell(cell)),
-                        None => line.push(' '),
+                        Some(cell) => match cell.foreground {
+                            Some(foreground) => terminal_control::write_truecolor(
+                                &mut line,
+                                cell.glyph,
+                                foreground,
+                                cell.background,
+                            )
+                            .expect("crossterm command writes to memory"),
+                            None => line.extend(render_cell(cell).bytes()),
+                        },
+                        None => line.push(b' '),
                     }
                 }
-                line
+                String::from_utf8(line).expect("screen cells render UTF-8")
+            })
+            .collect();
+        center_frame_lines(lines, resolved_width)
+    }
+}
+
+/// A reusable RGB pixel field packed into terminal half-block cells.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HalfBlockField {
+    width: usize,
+    pixel_height: usize,
+    cells: Vec<[Option<RgbColor>; 2]>,
+}
+
+impl HalfBlockField {
+    pub fn new(width: usize, pixel_height: usize) -> Self {
+        Self {
+            width,
+            pixel_height,
+            cells: vec![[None; 2]; width.saturating_mul(pixel_height.div_ceil(2))],
+        }
+    }
+
+    /// Sets a pixel, or removes it when `color` is `None`. Out-of-bounds writes are ignored.
+    pub fn set(&mut self, x: usize, y: usize, color: Option<RgbColor>) {
+        if x >= self.width || y >= self.pixel_height {
+            return;
+        }
+        self.cells[(y / 2) * self.width + x][y % 2] = color;
+    }
+
+    pub fn clear(&mut self) {
+        self.cells.fill([None; 2]);
+    }
+
+    /// Resizes the field and clears all samples, retaining existing allocation when possible.
+    pub fn resize(&mut self, width: usize, pixel_height: usize) {
+        self.width = width;
+        self.pixel_height = pixel_height;
+        self.cells
+            .resize(width.saturating_mul(pixel_height.div_ceil(2)), [None; 2]);
+        self.clear();
+    }
+
+    pub fn render_lines(&self, resolved_width: usize) -> Vec<String> {
+        if self.width == 0 || self.pixel_height == 0 {
+            return Vec::new();
+        }
+
+        let lines = self
+            .cells
+            .chunks_exact(self.width)
+            .map(|row| {
+                let mut line = Vec::new();
+                for cell in row {
+                    match *cell {
+                        [Some(upper), lower] => {
+                            terminal_control::write_truecolor(&mut line, '▀', upper, lower)
+                                .expect("crossterm command writes to memory")
+                        }
+                        [None, Some(lower)] => {
+                            terminal_control::write_truecolor(&mut line, '▄', lower, None)
+                                .expect("crossterm command writes to memory")
+                        }
+                        [None, None] => line.push(b' '),
+                    }
+                }
+                String::from_utf8(line).expect("crossterm commands emit UTF-8")
             })
             .collect();
         center_frame_lines(lines, resolved_width)
@@ -141,7 +259,13 @@ pub fn center_text(text: &str, width: usize) -> String {
 pub fn center_frame_lines(lines: Vec<String>, width: usize) -> Vec<String> {
     lines
         .into_iter()
-        .map(|line| center_text(&line, width))
+        .map(|line| {
+            if visible_line_width(&line) >= width {
+                line
+            } else {
+                center_text(&line, width)
+            }
+        })
         .collect()
 }
 
@@ -194,6 +318,7 @@ mod tests {
     fn render_screen_frame_is_one_synchronized_update() {
         const BEGIN: &str = "\x1b[?2026h";
         const END: &str = "\x1b[?2026l";
+        const RESET: &str = "\x1b[0m";
         let frame = vec!["a".repeat(4_096), "b".repeat(4_096), "c".to_string()];
         let mut output = Vec::new();
 
@@ -201,12 +326,78 @@ mod tests {
 
         let output = String::from_utf8(output).unwrap();
         assert!(output.len() > 8 * 1_024);
-        assert!(output.starts_with(BEGIN));
-        assert!(output.ends_with(END));
+        assert!(output.starts_with(&format!("{BEGIN}{RESET}")));
+        assert!(output.ends_with(&format!("{RESET}{END}")));
         assert_eq!(output.matches(BEGIN).count(), 1);
         assert_eq!(output.matches(END).count(), 1);
+        assert_eq!(output.matches(RESET).count(), frame.len() + 1);
+        assert!(terminal_control::clear_screen_sequence().starts_with(RESET));
         assert!(!output.contains('\n'));
         assert!(output.contains(&frame[0]));
         assert!(output.contains(&frame[1]));
+    }
+
+    #[test]
+    fn half_block_field_handles_colors_absence_bounds_and_resizes() {
+        let red = RgbColor::new(255, 0, 0);
+        let blue = RgbColor::new(0, 0, 255);
+        let green = RgbColor::new(0, 255, 0);
+        let yellow = RgbColor::new(255, 255, 0);
+        let purple = RgbColor::new(127, 0, 255);
+        let mut field = HalfBlockField::new(2, 3);
+
+        field.set(0, 0, Some(red));
+        field.set(0, 1, Some(blue));
+        field.set(1, 0, Some(green));
+        field.set(0, 2, Some(yellow));
+        field.set(2, 0, Some(purple));
+        field.set(0, 3, Some(purple));
+
+        let lines = field.render_lines(2);
+        assert_eq!(lines.len(), 2);
+        assert!(lines.iter().all(|line| visible_line_width(line) == 2));
+        assert_eq!(
+            lines[0],
+            "\x1b[38;2;255;0;0m\x1b[48;2;0;0;255m▀\x1b[49m\x1b[39m\x1b[38;2;0;255;0m▀\x1b[49m\x1b[39m"
+        );
+        assert_eq!(lines[1], "\x1b[38;2;255;255;0m▀\x1b[49m\x1b[39m ");
+
+        field.clear();
+        field.set(1, 1, Some(purple));
+        let lines = field.render_lines(2);
+        assert_eq!(lines[0], " \x1b[38;2;127;0;255m▄\x1b[49m\x1b[39m");
+        assert_eq!(lines[1], "  ");
+
+        field.resize(1, 1);
+        assert_eq!(field.render_lines(1), vec![" "]);
+        field.set(0, 0, Some(red));
+        field.set(0, 0, None);
+        assert_eq!(field.render_lines(1), vec![" "]);
+
+        assert!(HalfBlockField::new(0, 3).render_lines(80).is_empty());
+        assert!(HalfBlockField::new(3, 0).render_lines(80).is_empty());
+    }
+
+    #[test]
+    fn screen_cells_route_indexed_and_truecolor_rendering() {
+        let mut frame = ScreenFrame::new(2, 1);
+        frame.set(0, 0, ScreenCell::indexed('x', 3, 4));
+        frame.set(
+            1,
+            0,
+            ScreenCell::truecolor('▀', RgbColor::new(1, 2, 3), Some(RgbColor::new(4, 5, 6))),
+        );
+
+        assert_eq!(
+            frame.render_lines(2, |cell| {
+                assert_eq!(cell.glyph, 'x');
+                assert_eq!((cell.color_x, cell.color_y), (3, 4));
+                terminal_control::styled(cell.glyph, crossterm::style::Color::Red)
+            }),
+            vec![format!(
+                "{}\x1b[38;2;1;2;3m\x1b[48;2;4;5;6m▀\x1b[49m\x1b[39m",
+                terminal_control::styled('x', crossterm::style::Color::Red)
+            )]
+        );
     }
 }

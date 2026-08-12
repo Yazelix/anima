@@ -368,11 +368,7 @@ fn mandelbrot_cell(score: f64, view: MandelbrotView) -> Option<ScreenCell> {
     };
 
     let zoom_band = (view.zoom.max(1.0).log2() / 5.0).floor().max(0.0) as usize;
-    Some(ScreenCell {
-        glyph,
-        color_x: zoom_band,
-        color_y: intensity_bucket,
-    })
+    Some(ScreenCell::indexed(glyph, zoom_band, intensity_bucket))
 }
 
 fn colorize_mandelbrot_cell(cell: ScreenCell) -> String {

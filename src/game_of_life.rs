@@ -373,11 +373,7 @@ pub fn build_game_of_life_screen_lines(
                 continue;
             }
 
-            let cell = ScreenCell {
-                glyph: cell_style.glyph(),
-                color_x: x,
-                color_y: y,
-            };
+            let cell = ScreenCell::indexed(cell_style.glyph(), x, y);
             let origin_x = x * 2;
             for dx in 0..2 {
                 frame.set(origin_x + dx, y, cell);
