@@ -95,6 +95,9 @@ Supported styles:
 
 No style means `random`
 
+In native animations, `Left`/`h`/`p` selects the previous style and
+`Right`/`l`/`n` selects the next; any other key exits
+
 Random chooses from the dogfooded animated styles. `static`, `logo`, and
 `friends_and_enemies` remain explicitly selectable but outside that pool
 

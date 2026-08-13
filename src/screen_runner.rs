@@ -7,7 +7,7 @@ use crate::{
     leave_screen_mode, mandelbrot_frame_delay, matrix_frame_delay, render_screen_frame,
     terminal_height, terminal_width,
 };
-use crossterm::event::{self, Event};
+use crossterm::event::{self, KeyCode, KeyEvent, KeyEventKind};
 use std::io::{self, Write};
 use std::process::Command;
 use std::time::{Duration, Instant};
@@ -48,13 +48,31 @@ enum ScreenStyle {
     Animation(AnimationStyle),
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum AnimationStyle {
     Boids(BoidsVariant),
     GameOfLife(&'static str),
     FriendsAndEnemies,
     Mandelbrot,
     Matrix,
+}
+
+const ANIMATION_STYLES: &[AnimationStyle] = &[
+    AnimationStyle::Boids(BoidsVariant::Predator),
+    AnimationStyle::Boids(BoidsVariant::Schools),
+    AnimationStyle::FriendsAndEnemies,
+    AnimationStyle::Mandelbrot,
+    AnimationStyle::Matrix,
+    AnimationStyle::GameOfLife(GAME_OF_LIFE_RANDOM_STYLES[0]),
+    AnimationStyle::GameOfLife(GAME_OF_LIFE_RANDOM_STYLES[1]),
+    AnimationStyle::GameOfLife(GAME_OF_LIFE_RANDOM_STYLES[2]),
+];
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum InputAction {
+    Exit,
+    Previous,
+    Next,
 }
 
 struct ScreenArgs {
@@ -163,7 +181,7 @@ fn parse_screen_args(
 
 fn print_screen_help(command_name: &str) -> Result<(), String> {
     let help = format!(
-        "Show Yazelix terminal screen animations\n\nUsage:\n  {command_name} [STYLE] [--cell-style full_block|dotted] [--duration-seconds N]\n\nStyles:\n  {}\n  random\n\nNotes:\n  Press any key to exit\n",
+        "Show Yazelix terminal screen animations\n\nUsage:\n  {command_name} [STYLE] [--cell-style full_block|dotted] [--duration-seconds N]\n\nStyles:\n  {}\n  random\n\nNotes:\n  Native animations: Left/h/p = previous; Right/l/n = next; any other key = exit\n  Other styles: any key = exit\n",
         SCREEN_STYLES.join("\n  ")
     );
     let stdout = io::stdout();
@@ -249,7 +267,7 @@ fn run_static(duration: Option<Duration>) -> Result<(), String> {
     }
 
     loop {
-        if poll_for_keypress(Duration::from_millis(250))? {
+        if poll_for_input(Duration::from_millis(250))?.is_some() {
             return Ok(());
         }
         let current = (terminal_width(), terminal_height());
@@ -269,7 +287,7 @@ fn run_logo(duration: Option<Duration>) -> Result<(), String> {
         for frame in frames {
             render_screen_frame(&frame)
                 .map_err(|error| format!("could not render logo: {error}"))?;
-            if poll_for_keypress(delay)? {
+            if poll_for_input(delay)?.is_some() {
                 break;
             }
         }
@@ -280,7 +298,7 @@ fn run_logo(duration: Option<Duration>) -> Result<(), String> {
     loop {
         render_screen_frame(&frames[index % frames.len()])
             .map_err(|error| format!("could not render logo frame: {error}"))?;
-        if poll_for_keypress(Duration::from_millis(180))? {
+        if poll_for_input(Duration::from_millis(180))?.is_some() {
             return Ok(());
         }
         let current = (terminal_width(), terminal_height());
@@ -295,40 +313,41 @@ fn run_logo(duration: Option<Duration>) -> Result<(), String> {
 }
 
 fn run_animation(
-    style: AnimationStyle,
+    mut style: AnimationStyle,
     cell_style: GameOfLifeCellStyle,
     duration: Option<Duration>,
 ) -> Result<(), String> {
-    let started = duration.map(|_| Instant::now());
+    let timing = duration.map(|duration| (Instant::now(), duration));
     let mut width = terminal_width();
     let mut height = terminal_height();
     let mut animation = build_animation(style, width, height, cell_style);
-    let frame_delay = frame_delay(style);
+    let mut cadence = frame_delay(style);
 
     loop {
-        if let (Some(started), Some(duration)) = (started, duration)
-            && started.elapsed() >= duration
-        {
+        if timing.is_some_and(|(started, duration)| started.elapsed() >= duration) {
             return Ok(());
         }
 
         render_screen_frame(&animation.render_frame())
             .map_err(|error| format!("could not render screen frame: {error}"))?;
-        let delay = if let (Some(started), Some(duration)) = (started, duration) {
-            frame_delay.min(duration.saturating_sub(started.elapsed()))
-        } else {
-            frame_delay
-        };
-        if poll_for_keypress(delay)? {
-            return Ok(());
-        }
-
+        let delay = timing.map_or(cadence, |(started, duration)| {
+            cadence.min(duration.saturating_sub(started.elapsed()))
+        });
+        let action = poll_for_input(delay)?;
         let current = (terminal_width(), terminal_height());
-        if current != (width, height) {
-            (width, height) = current;
-            animation.resize(context_for_style(style, width, height));
-        } else {
-            animation.advance_frame();
+        match action {
+            Some(InputAction::Exit) => return Ok(()),
+            Some(action @ (InputAction::Previous | InputAction::Next)) => {
+                style = browse_animation(style, action);
+                (width, height) = current;
+                animation = build_animation(style, width, height, cell_style);
+                cadence = frame_delay(style);
+            }
+            None if current != (width, height) => {
+                (width, height) = current;
+                animation.resize(context_for_style(style, width, height));
+            }
+            None => animation.advance_frame(),
         }
     }
 }
@@ -337,7 +356,7 @@ fn wait_for_duration(duration: Duration) -> Result<(), String> {
     let started = Instant::now();
     while started.elapsed() < duration {
         let remaining = duration.saturating_sub(started.elapsed());
-        if poll_for_keypress(Duration::from_millis(100).min(remaining))? {
+        if poll_for_input(Duration::from_millis(100).min(remaining))?.is_some() {
             break;
         }
     }
@@ -404,22 +423,45 @@ fn frame_delay(style: AnimationStyle) -> Duration {
     }
 }
 
-fn poll_for_keypress(timeout: Duration) -> Result<bool, String> {
-    if !event::poll(timeout).map_err(|error| format!("could not poll terminal input: {error}"))? {
-        return Ok(false);
+fn browse_animation(style: AnimationStyle, action: InputAction) -> AnimationStyle {
+    let offset = match action {
+        InputAction::Previous => ANIMATION_STYLES.len() - 1,
+        InputAction::Next => 1,
+        InputAction::Exit => return style,
+    };
+    let index = ANIMATION_STYLES
+        .iter()
+        .position(|candidate| *candidate == style)
+        .expect("native animation style is browsable");
+    ANIMATION_STYLES[(index + offset) % ANIMATION_STYLES.len()]
+}
+
+fn key_action(key: KeyEvent) -> Option<InputAction> {
+    match (key.kind, key.modifiers.is_empty(), key.code) {
+        (KeyEventKind::Release, _, _) => None,
+        (_, true, KeyCode::Left | KeyCode::Char('h' | 'p')) => Some(InputAction::Previous),
+        (_, true, KeyCode::Right | KeyCode::Char('l' | 'n')) => Some(InputAction::Next),
+        _ => Some(InputAction::Exit),
     }
+}
+
+fn poll_for_input(timeout: Duration) -> Result<Option<InputAction>, String> {
+    let started = Instant::now();
+    let mut wait = timeout;
 
     loop {
-        match event::read().map_err(|error| format!("could not read terminal input: {error}"))? {
-            Event::Key(_) => return Ok(true),
-            _ => {
-                if !event::poll(Duration::from_millis(0))
-                    .map_err(|error| format!("could not poll terminal input: {error}"))?
-                {
-                    return Ok(false);
-                }
-            }
+        if !event::poll(wait).map_err(|error| format!("could not poll terminal input: {error}"))? {
+            return Ok(None);
         }
+        let key = event::read()
+            .map_err(|error| format!("could not read terminal input: {error}"))?
+            .as_key_event();
+        if let Some(action) = key.and_then(key_action) {
+            return Ok(Some(action));
+        }
+        wait = key.map_or(Duration::ZERO, |_| {
+            timeout.saturating_sub(started.elapsed())
+        });
     }
 }
 
@@ -612,6 +654,7 @@ fn ansi(code: &str, text: impl AsRef<str>) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
     // Test lane: default
 
@@ -629,6 +672,57 @@ mod tests {
         for style in [STATIC_STYLE, LOGO_STYLE, FRIENDS_AND_ENEMIES_STYLE] {
             assert!(!SCREEN_RANDOM_STYLES.contains(&style));
             assert!(resolve_style(style, None, "yzs").is_ok());
+        }
+    }
+
+    #[test]
+    fn native_animation_navigation_maps_keys_and_wraps_in_canonical_order() {
+        let action = |code| key_action(KeyEvent::new(code, KeyModifiers::NONE));
+        for code in [KeyCode::Left, KeyCode::Char('h'), KeyCode::Char('p')] {
+            assert_eq!(action(code), Some(InputAction::Previous));
+        }
+        for code in [KeyCode::Right, KeyCode::Char('l'), KeyCode::Char('n')] {
+            assert_eq!(action(code), Some(InputAction::Next));
+        }
+        for key in [
+            KeyEvent::new(KeyCode::Char('q'), KeyModifiers::NONE),
+            KeyEvent::new(KeyCode::Char('h'), KeyModifiers::CONTROL),
+            KeyEvent::new(KeyCode::Right, KeyModifiers::ALT),
+        ] {
+            assert_eq!(key_action(key), Some(InputAction::Exit));
+        }
+        assert_eq!(
+            key_action(KeyEvent::new_with_kind(
+                KeyCode::Char('l'),
+                KeyModifiers::NONE,
+                KeyEventKind::Release,
+            )),
+            None
+        );
+
+        assert_eq!(
+            ANIMATION_STYLES,
+            &[
+                AnimationStyle::Boids(BoidsVariant::Predator),
+                AnimationStyle::Boids(BoidsVariant::Schools),
+                AnimationStyle::FriendsAndEnemies,
+                AnimationStyle::Mandelbrot,
+                AnimationStyle::Matrix,
+                AnimationStyle::GameOfLife(GAME_OF_LIFE_RANDOM_STYLES[0]),
+                AnimationStyle::GameOfLife(GAME_OF_LIFE_RANDOM_STYLES[1]),
+                AnimationStyle::GameOfLife(GAME_OF_LIFE_RANDOM_STYLES[2]),
+            ]
+        );
+        for index in 0..ANIMATION_STYLES.len() {
+            let current = ANIMATION_STYLES[index];
+            assert_eq!(
+                browse_animation(current, InputAction::Next),
+                ANIMATION_STYLES[(index + 1) % ANIMATION_STYLES.len()]
+            );
+            assert_eq!(
+                browse_animation(current, InputAction::Previous),
+                ANIMATION_STYLES[(index + ANIMATION_STYLES.len() - 1) % ANIMATION_STYLES.len()]
+            );
         }
     }
 
