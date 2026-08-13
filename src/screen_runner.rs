@@ -1,10 +1,11 @@
 use crate::random::system_random_index;
 use crate::{
-    BoidsAnimation, BoidsVariant, GAME_OF_LIFE_RANDOM_STYLES, GameOfLifeAnimation,
-    GameOfLifeCellStyle, MANDELBROT_STYLE, MATRIX_STYLE, MandelbrotAnimation, MatrixAnimation,
-    RawModeGuard, ScreenAnimationContext, ScreenFrameProducer, center_frame_lines, center_text,
-    enter_screen_mode, game_of_life_spec, leave_screen_mode, mandelbrot_frame_delay,
-    matrix_frame_delay, render_screen_frame, terminal_height, terminal_width,
+    BoidsAnimation, BoidsVariant, FRIENDS_AND_ENEMIES_STYLE, FriendsAndEnemiesAnimation,
+    GAME_OF_LIFE_RANDOM_STYLES, GameOfLifeAnimation, GameOfLifeCellStyle, MANDELBROT_STYLE,
+    MATRIX_STYLE, MandelbrotAnimation, MatrixAnimation, RawModeGuard, ScreenAnimationContext,
+    ScreenFrameProducer, center_frame_lines, center_text, enter_screen_mode, game_of_life_spec,
+    leave_screen_mode, mandelbrot_frame_delay, matrix_frame_delay, render_screen_frame,
+    terminal_height, terminal_width,
 };
 use crossterm::event::{self, Event};
 use std::io::{self, Write};
@@ -21,6 +22,7 @@ pub const SCREEN_STYLES: &[&str] = &[
     "boids",
     "boids_predator",
     "boids_schools",
+    FRIENDS_AND_ENEMIES_STYLE,
     MANDELBROT_STYLE,
     MATRIX_STYLE,
     "game_of_life_gliders",
@@ -50,6 +52,7 @@ enum ScreenStyle {
 enum AnimationStyle {
     Boids(BoidsVariant),
     GameOfLife(&'static str),
+    FriendsAndEnemies,
     Mandelbrot,
     Matrix,
 }
@@ -194,6 +197,9 @@ fn resolve_style(
     }
     if normalized == MANDELBROT_STYLE {
         return Ok(ScreenStyle::Animation(AnimationStyle::Mandelbrot));
+    }
+    if normalized == FRIENDS_AND_ENEMIES_STYLE {
+        return Ok(ScreenStyle::Animation(AnimationStyle::FriendsAndEnemies));
     }
     if normalized == MATRIX_STYLE {
         return Ok(ScreenStyle::Animation(AnimationStyle::Matrix));
@@ -352,6 +358,7 @@ fn build_animation(
         AnimationStyle::GameOfLife(style_name) => {
             Box::new(GameOfLifeAnimation::new(style_name, context, cell_style))
         }
+        AnimationStyle::FriendsAndEnemies => Box::new(FriendsAndEnemiesAnimation::new(context)),
         AnimationStyle::Mandelbrot => Box::new(MandelbrotAnimation::new(context)),
         AnimationStyle::Matrix => Box::new(MatrixAnimation::new(context)),
     }
@@ -360,9 +367,10 @@ fn build_animation(
 fn context_for_style(style: AnimationStyle, width: usize, height: usize) -> ScreenAnimationContext {
     match style {
         AnimationStyle::GameOfLife(_) => game_of_life_context(width, height),
-        AnimationStyle::Boids(_) | AnimationStyle::Mandelbrot | AnimationStyle::Matrix => {
-            full_screen_context(width, height)
-        }
+        AnimationStyle::Boids(_)
+        | AnimationStyle::FriendsAndEnemies
+        | AnimationStyle::Mandelbrot
+        | AnimationStyle::Matrix => full_screen_context(width, height),
     }
 }
 
@@ -389,6 +397,7 @@ fn full_screen_context(width: usize, height: usize) -> ScreenAnimationContext {
 fn frame_delay(style: AnimationStyle) -> Duration {
     match style {
         AnimationStyle::Boids(_) => Duration::from_millis(70),
+        AnimationStyle::FriendsAndEnemies => Duration::from_millis(55),
         AnimationStyle::Mandelbrot => mandelbrot_frame_delay(),
         AnimationStyle::Matrix => matrix_frame_delay(),
         AnimationStyle::GameOfLife(_) => Duration::from_millis(160),
@@ -614,10 +623,10 @@ mod tests {
         }
     }
 
-    // Defends: random welcome avoids card-like styles while keeping them explicitly selectable.
+    // Defends: random welcome uses only dogfooded styles while exclusions remain selectable.
     #[test]
-    fn random_pool_skips_static_and_logo() {
-        for style in [STATIC_STYLE, LOGO_STYLE] {
+    fn random_pool_keeps_excluded_styles_explicit() {
+        for style in [STATIC_STYLE, LOGO_STYLE, FRIENDS_AND_ENEMIES_STYLE] {
             assert!(!SCREEN_RANDOM_STYLES.contains(&style));
             assert!(resolve_style(style, None, "yzs").is_ok());
         }

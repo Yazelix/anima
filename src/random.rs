@@ -51,9 +51,20 @@ pub(crate) fn system_random_index(max_len: usize) -> usize {
     nanos % max_len.max(1)
 }
 
+pub(crate) fn size_seed(width: usize, height: usize, salt: u64) -> u64 {
+    (width as u64)
+        .wrapping_mul(1_103_515_245)
+        .wrapping_add((height as u64).wrapping_mul(12_345))
+        .wrapping_add(salt)
+}
+
 pub(crate) fn unit_from_seed(seed: &mut u64) -> f64 {
     *seed = seed.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
     ((*seed >> 33) as f64) / ((1u64 << 31) as f64)
+}
+
+pub(crate) fn seeded_index(seed: &mut u64, length: usize) -> usize {
+    (unit_from_seed(seed) * length as f64) as usize
 }
 
 fn lcm(left: usize, right: usize) -> usize {

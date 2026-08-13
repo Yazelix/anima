@@ -1,4 +1,4 @@
-use crate::random::unit_from_seed;
+use crate::random::{size_seed, unit_from_seed};
 use crate::{
     GameOfLifeCellStyle, ScreenAnimationContext, ScreenCell, ScreenFrame, ScreenFrameProducer,
 };
@@ -181,10 +181,7 @@ fn seed_boids(context: ScreenAnimationContext, variant: BoidsVariant) -> Vec<Boi
     let grid_height = context.resolved_height.max(1);
     let area = grid_width.saturating_mul(grid_height);
     let count = (area / 90).clamp(8, 32);
-    let mut seed = (grid_width as u64)
-        .wrapping_mul(1_103_515_245)
-        .wrapping_add((grid_height as u64).wrapping_mul(12_345))
-        .wrapping_add(0x5EED);
+    let mut seed = size_seed(grid_width, grid_height, 0x5EED);
 
     (0..count)
         .map(|index| {

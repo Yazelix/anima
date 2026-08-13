@@ -1,16 +1,18 @@
 use std::{io, thread, time::Duration};
 
 use yazelix_screen::{
-    BoidsAnimation, BoidsVariant, GAME_OF_LIFE_RANDOM_STYLES, GameOfLifeAnimation,
-    GameOfLifeCellStyle, MANDELBROT_STYLE, MATRIX_STYLE, MandelbrotAnimation, MatrixAnimation,
-    ScreenAnimationContext, ScreenFrameProducer, enter_screen_mode, game_of_life_spec,
-    leave_screen_mode, mandelbrot_frame_delay, matrix_frame_delay, render_screen_frame,
-    terminal_height, terminal_width,
+    BoidsAnimation, BoidsVariant, FRIENDS_AND_ENEMIES_STYLE, FriendsAndEnemiesAnimation,
+    GAME_OF_LIFE_RANDOM_STYLES, GameOfLifeAnimation, GameOfLifeCellStyle, MANDELBROT_STYLE,
+    MATRIX_STYLE, MandelbrotAnimation, MatrixAnimation, ScreenAnimationContext,
+    ScreenFrameProducer, enter_screen_mode, game_of_life_spec, leave_screen_mode,
+    mandelbrot_frame_delay, matrix_frame_delay, render_screen_frame, terminal_height,
+    terminal_width,
 };
 
 #[derive(Debug, Clone, Copy)]
 enum ExampleStyle {
     Boids(BoidsVariant),
+    FriendsAndEnemies,
     GameOfLife(&'static str),
     Mandelbrot,
     Matrix,
@@ -58,6 +60,9 @@ fn resolve_style(raw: &str) -> Result<ExampleStyle, io::Error> {
     if let Some(variant) = BoidsVariant::from_style_name(&normalized) {
         return Ok(ExampleStyle::Boids(variant));
     }
+    if normalized == FRIENDS_AND_ENEMIES_STYLE {
+        return Ok(ExampleStyle::FriendsAndEnemies);
+    }
     if normalized == MANDELBROT_STYLE {
         return Ok(ExampleStyle::Mandelbrot);
     }
@@ -75,7 +80,7 @@ fn resolve_style(raw: &str) -> Result<ExampleStyle, io::Error> {
     Err(io::Error::new(
         io::ErrorKind::InvalidInput,
         format!(
-            "unsupported style `{normalized}`; expected boids, boids_predator, boids_schools, mandelbrot, matrix, game_of_life_gliders, game_of_life_oscillators, or game_of_life_bloom"
+            "unsupported style `{normalized}`; expected boids, boids_predator, boids_schools, friends_and_enemies, mandelbrot, matrix, game_of_life_gliders, game_of_life_oscillators, or game_of_life_bloom"
         ),
     ))
 }
@@ -93,6 +98,7 @@ fn build_animation(style: ExampleStyle) -> Box<dyn ScreenFrameProducer> {
             context,
             GameOfLifeCellStyle::FullBlock,
         )),
+        ExampleStyle::FriendsAndEnemies => Box::new(FriendsAndEnemiesAnimation::new(context)),
         ExampleStyle::Mandelbrot => Box::new(MandelbrotAnimation::new(context)),
         ExampleStyle::Matrix => Box::new(MatrixAnimation::new(context)),
     }
@@ -105,7 +111,10 @@ fn context_for_style(style: ExampleStyle, width: usize, height: usize) -> Screen
             let spec = game_of_life_spec(size_class);
             width.saturating_sub(6).max(spec.minimum_inner_width)
         }
-        ExampleStyle::Boids(_) | ExampleStyle::Mandelbrot | ExampleStyle::Matrix => width,
+        ExampleStyle::Boids(_)
+        | ExampleStyle::FriendsAndEnemies
+        | ExampleStyle::Mandelbrot
+        | ExampleStyle::Matrix => width,
     };
 
     ScreenAnimationContext {
@@ -131,6 +140,7 @@ fn size_class(width: usize) -> &'static str {
 fn frame_delay(style: ExampleStyle) -> Duration {
     match style {
         ExampleStyle::Boids(_) => Duration::from_millis(70),
+        ExampleStyle::FriendsAndEnemies => Duration::from_millis(55),
         ExampleStyle::Mandelbrot => mandelbrot_frame_delay(),
         ExampleStyle::Matrix => matrix_frame_delay(),
         ExampleStyle::GameOfLife(_) => Duration::from_millis(160),

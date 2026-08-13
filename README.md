@@ -10,13 +10,14 @@ nix run github:Yazelix/anima#yzs
 nix run github:Yazelix/anima#yzs -- static
 nix run github:Yazelix/anima#yzs -- asciiquarium --duration-seconds 3
 nix run github:Yazelix/anima#yzs -- mandelbrot
+nix run github:Yazelix/anima#yzs -- friends_and_enemies
 nix run github:Yazelix/anima#yzs -- game_of_life_bloom --cell-style dotted
 nix run github:Yazelix/anima#yzs -- random --duration-seconds 3
 ```
 
 ## What It Contains
 
-- Animation engines for Boids, Mandelbrot, Matrix rain, and Game of Life
+- Animation engines for Boids, friends and enemies, Mandelbrot, Matrix rain, and Game of Life
 - The separately packaged `asciiquarium-rs` terminal aquarium
 - Static and logo-style Yazelix welcome screens
 - File-backed Kitty PNG frame sequence rendering
@@ -34,6 +35,7 @@ yzs --help
 yzs
 yzs static
 yzs asciiquarium --duration-seconds 3
+yzs friends_and_enemies --duration-seconds 3
 yzs mandelbrot
 yzs game_of_life_bloom --cell-style dotted
 yzs random --duration-seconds 3
@@ -54,6 +56,7 @@ From this repository:
 cargo run --bin yzs -- --help
 cargo run --bin yzs -- static
 cargo run --bin yzs -- asciiquarium --duration-seconds 3
+cargo run --bin yzs -- friends_and_enemies --duration-seconds 3
 cargo run --bin yzs -- mandelbrot
 cargo run --bin yzs -- game_of_life_bloom --cell-style dotted
 cargo run --bin yzs -- random --duration-seconds 3
@@ -69,6 +72,7 @@ nix build .#yzs
 nix run .#yzs -- --help
 nix run .#yzs -- static
 nix run .#yzs -- asciiquarium --duration-seconds 3
+nix run .#yzs -- friends_and_enemies --duration-seconds 3
 nix run .#yzs -- mandelbrot
 nix run .#yzs -- random --duration-seconds 3
 ```
@@ -81,6 +85,7 @@ Supported styles:
 - `boids`
 - `boids_predator`
 - `boids_schools`
+- `friends_and_enemies`
 - `mandelbrot`
 - `matrix`
 - `game_of_life_gliders`
@@ -90,8 +95,8 @@ Supported styles:
 
 No style means `random`
 
-Random chooses from the animated styles, excluding `static` and `logo`; use
-those styles explicitly for the card-like welcome screens
+Random chooses from the dogfooded animated styles. `static`, `logo`, and
+`friends_and_enemies` remain explicitly selectable but outside that pool
 
 The aquarium runs as a separate
 [`asciiquarium-rs`](https://github.com/cablehead/asciiquarium-rs) process under
@@ -114,6 +119,7 @@ Play a style for a bounded number of frames:
 cargo run --example play_style -- mandelbrot 90
 cargo run --example play_style -- matrix 90
 cargo run --example play_style -- boids_schools 120
+cargo run --example play_style -- friends_and_enemies 90
 cargo run --example play_style -- game_of_life_gliders 80
 ```
 

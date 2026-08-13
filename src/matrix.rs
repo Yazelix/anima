@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crate::random::unit_from_seed;
+use crate::random::{seeded_index, size_seed};
 use crate::{ScreenAnimationContext, ScreenCell, ScreenFrame, ScreenFrameProducer};
 use crossterm::style::Color;
 
@@ -27,10 +27,11 @@ pub struct MatrixAnimation {
 
 impl MatrixAnimation {
     pub fn new(context: ScreenAnimationContext) -> Self {
-        let mut seed = (context.inner_width as u64)
-            .wrapping_mul(1_103_515_245)
-            .wrapping_add((context.resolved_height as u64).wrapping_mul(12_345))
-            .wrapping_add(0x4D41_5452_4958);
+        let mut seed = size_seed(
+            context.inner_width,
+            context.resolved_height,
+            0x4D41_5452_4958,
+        );
         let columns = (0..context.inner_width)
             .map(|_| new_column(&mut seed, context.resolved_height, true))
             .collect();
@@ -98,25 +99,21 @@ pub fn matrix_frame_delay() -> Duration {
 fn new_column(seed: &mut u64, height: usize, warm: bool) -> MatrixColumn {
     let minimum_length = height.clamp(1, 4);
     let maximum_length = (height.saturating_mul(2) / 3).clamp(minimum_length, 24);
-    let length = minimum_length + random_index(seed, maximum_length - minimum_length + 1);
-    let speed = 1 + random_index(seed, 3);
+    let length = minimum_length + seeded_index(seed, maximum_length - minimum_length + 1);
+    let speed = 1 + seeded_index(seed, 3);
     let head = if warm {
-        random_index(seed, height.max(1)) as i32
+        seeded_index(seed, height.max(1)) as i32
     } else {
-        -(random_index(seed, (height / 4).max(1)) as i32) - 1
+        -(seeded_index(seed, (height / 4).max(1)) as i32) - 1
     };
 
     MatrixColumn {
         head,
         length,
         speed,
-        phase: random_index(seed, speed),
+        phase: seeded_index(seed, speed),
         glyph_seed: *seed,
     }
-}
-
-fn random_index(seed: &mut u64, length: usize) -> usize {
-    (unit_from_seed(seed) * length as f64) as usize
 }
 
 fn trail_tone(age: usize, length: usize) -> usize {
