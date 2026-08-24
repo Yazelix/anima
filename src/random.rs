@@ -1,10 +1,6 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
-pub const GAME_OF_LIFE_RANDOM_STYLES: &[&str] = &[
-    "game_of_life_gliders",
-    "game_of_life_oscillators",
-    "game_of_life_bloom",
-];
+pub const GAME_OF_LIFE_RANDOM_STYLES: &[&str] = &["game_of_life_gliders", "game_of_life_tumblers"];
 pub const BOIDS_RANDOM_STYLES: &[&str] = &["boids_predator", "boids_schools"];
 pub const MANDELBROT_STYLE: &str = "mandelbrot";
 const RANDOM_ANIMATION_FAMILIES: &[&[&str]] = &[
@@ -110,10 +106,11 @@ mod tests {
             }
         }
 
-        assert_eq!(game_of_life_count, 6);
-        assert_eq!(boids_count, 6);
-        assert_eq!(mandelbrot_count, 6);
-        assert_eq!(matrix_count, 6);
-        assert_eq!(primordial_count, 6);
+        let expected = random_animation_subpool_width();
+        assert_eq!(game_of_life_count, expected);
+        assert_eq!(boids_count, expected);
+        assert_eq!(mandelbrot_count, expected);
+        assert_eq!(matrix_count, expected);
+        assert_eq!(primordial_count, expected);
     }
 }

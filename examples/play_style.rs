@@ -84,7 +84,7 @@ fn resolve_style(raw: &str) -> Result<ExampleStyle, io::Error> {
     Err(io::Error::new(
         io::ErrorKind::InvalidInput,
         format!(
-            "unsupported style `{normalized}`; expected boids, boids_predator, boids_schools, friends_and_enemies, primordial, mandelbrot, matrix, game_of_life_gliders, game_of_life_oscillators, or game_of_life_bloom"
+            "unsupported style `{normalized}`; expected boids, boids_predator, boids_schools, friends_and_enemies, primordial, mandelbrot, matrix, game_of_life_gliders, or game_of_life_tumblers"
         ),
     ))
 }

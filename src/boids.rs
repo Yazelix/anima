@@ -1034,7 +1034,7 @@ mod tests {
             Some(BoidsVariant::Schools)
         );
         assert_eq!(BoidsVariant::from_style_name("boids_flow"), None);
-        assert_eq!(BoidsVariant::from_style_name("game_of_life_bloom"), None);
+        assert_eq!(BoidsVariant::from_style_name("game_of_life_tumblers"), None);
     }
 
     // Defends: boids variants alter simulation behavior, not just labels or colors.

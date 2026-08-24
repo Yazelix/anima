@@ -12,7 +12,7 @@ nix run github:Yazelix/anima#yzs -- asciiquarium --duration-seconds 3
 nix run github:Yazelix/anima#yzs -- mandelbrot
 nix run github:Yazelix/anima#yzs -- friends_and_enemies
 nix run github:Yazelix/anima#yzs -- primordial
-nix run github:Yazelix/anima#yzs -- game_of_life_bloom --cell-style dotted
+nix run github:Yazelix/anima#yzs -- game_of_life_tumblers --cell-style dotted
 nix run github:Yazelix/anima#yzs -- random --duration-seconds 3
 ```
 
@@ -62,7 +62,7 @@ yzs asciiquarium --duration-seconds 3
 yzs friends_and_enemies --duration-seconds 3
 yzs primordial --duration-seconds 3
 yzs mandelbrot
-yzs game_of_life_bloom --cell-style dotted
+yzs game_of_life_tumblers --cell-style dotted
 yzs random --duration-seconds 3
 ```
 
@@ -84,7 +84,7 @@ cargo run --bin yzs -- asciiquarium --duration-seconds 3
 cargo run --bin yzs -- friends_and_enemies --duration-seconds 3
 cargo run --bin yzs -- primordial --duration-seconds 3
 cargo run --bin yzs -- mandelbrot
-cargo run --bin yzs -- game_of_life_bloom --cell-style dotted
+cargo run --bin yzs -- game_of_life_tumblers --cell-style dotted
 cargo run --bin yzs -- random --duration-seconds 3
 ```
 
@@ -117,8 +117,7 @@ Supported styles:
 - `mandelbrot`
 - `matrix`
 - `game_of_life_gliders`
-- `game_of_life_oscillators`
-- `game_of_life_bloom`
+- `game_of_life_tumblers`
 - `random`
 
 No style means `random`

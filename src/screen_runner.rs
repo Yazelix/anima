@@ -28,8 +28,7 @@ pub const SCREEN_STYLES: &[&str] = &[
     MANDELBROT_STYLE,
     MATRIX_STYLE,
     "game_of_life_gliders",
-    "game_of_life_oscillators",
-    "game_of_life_bloom",
+    "game_of_life_tumblers",
 ];
 pub const SCREEN_RANDOM_STYLES: &[&str] = &[
     ASCIQUARIUM_STYLE,
@@ -40,8 +39,7 @@ pub const SCREEN_RANDOM_STYLES: &[&str] = &[
     MANDELBROT_STYLE,
     MATRIX_STYLE,
     "game_of_life_gliders",
-    "game_of_life_oscillators",
-    "game_of_life_bloom",
+    "game_of_life_tumblers",
 ];
 
 enum ScreenStyle {
@@ -70,7 +68,6 @@ const ANIMATION_STYLES: &[AnimationStyle] = &[
     AnimationStyle::Matrix,
     AnimationStyle::GameOfLife(GAME_OF_LIFE_RANDOM_STYLES[0]),
     AnimationStyle::GameOfLife(GAME_OF_LIFE_RANDOM_STYLES[1]),
-    AnimationStyle::GameOfLife(GAME_OF_LIFE_RANDOM_STYLES[2]),
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -675,6 +672,9 @@ mod tests {
         for style in SCREEN_STYLES {
             assert!(resolve_style(style, None, "yzs").is_ok());
         }
+        for style in ["game_of_life_oscillators", "game_of_life_bloom"] {
+            assert!(resolve_style(style, None, "yzs").is_err());
+        }
     }
 
     // Defends: random welcome uses only dogfooded styles while exclusions remain selectable.
@@ -722,7 +722,6 @@ mod tests {
                 AnimationStyle::Matrix,
                 AnimationStyle::GameOfLife(GAME_OF_LIFE_RANDOM_STYLES[0]),
                 AnimationStyle::GameOfLife(GAME_OF_LIFE_RANDOM_STYLES[1]),
-                AnimationStyle::GameOfLife(GAME_OF_LIFE_RANDOM_STYLES[2]),
             ]
         );
         for index in 0..ANIMATION_STYLES.len() {

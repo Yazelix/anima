@@ -3,20 +3,26 @@ use crossterm::style::Color;
 use std::collections::{HashMap, HashSet};
 
 const RIGHT_GLIDER: &[(i32, i32)] = &[(1, 0), (2, 1), (0, 2), (1, 2), (2, 2)];
-const BLINKER: &[(i32, i32)] = &[(0, 0), (1, 0), (2, 0)];
-const TOAD: &[(i32, i32)] = &[(1, 0), (2, 0), (3, 0), (0, 1), (1, 1), (2, 1)];
-const BEACON: &[(i32, i32)] = &[
-    (0, 0),
+// Source: https://conwaylife.com/wiki/Tumbler
+const TUMBLER: &[(i32, i32)] = &[
     (1, 0),
+    (7, 0),
     (0, 1),
-    (1, 1),
-    (2, 2),
+    (2, 1),
+    (6, 1),
+    (8, 1),
+    (0, 2),
     (3, 2),
+    (5, 2),
+    (8, 2),
     (2, 3),
-    (3, 3),
+    (6, 3),
+    (2, 4),
+    (3, 4),
+    (5, 4),
+    (6, 4),
 ];
-const R_PENTOMINO: &[(i32, i32)] = &[(1, 0), (2, 0), (0, 1), (1, 1), (1, 2)];
-const ACORN: &[(i32, i32)] = &[(1, 0), (3, 1), (0, 2), (1, 2), (4, 2), (5, 2), (6, 2)];
+const TUMBLER_CYCLE_ENVELOPE: (i32, i32) = (9, 7);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GameOfLifeCellStyle {
@@ -57,16 +63,14 @@ impl GameOfLifeCellStyleParseError {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum GameOfLifeVariant {
     Gliders,
-    Oscillators,
-    Bloom,
+    Tumblers,
 }
 
 impl GameOfLifeVariant {
     fn from_style_name(style: &str) -> Option<Self> {
         match style {
             "game_of_life_gliders" => Some(Self::Gliders),
-            "game_of_life_oscillators" => Some(Self::Oscillators),
-            "game_of_life_bloom" => Some(Self::Bloom),
+            "game_of_life_tumblers" => Some(Self::Tumblers),
             _ => None,
         }
     }
@@ -227,6 +231,7 @@ fn place_shape(
     shape
         .iter()
         .map(|(x, y)| (x + origin_x, y + origin_y))
+        .filter(|&(x, y)| x < width && y < height)
         .collect()
 }
 
@@ -269,31 +274,21 @@ fn build_game_of_life_gliders_seed(width: i32, height: i32) -> HashSet<(i32, i32
         .collect()
 }
 
-fn build_game_of_life_oscillators_seed(width: i32, height: i32) -> HashSet<(i32, i32)> {
-    let placements = vec![
-        (BEACON, 1, 1),
-        (BLINKER, (width / 2) - 1, 1),
-        (TOAD, (width / 2) - 2, (height / 2) - 1),
-        (BLINKER, 2, height - 2),
-        (BEACON, width - 5, height - 5),
-    ];
-    placements
-        .into_iter()
-        .flat_map(|(shape, x, y)| place_shape(shape, width, height, x, y))
-        .collect()
-}
+fn build_game_of_life_tumblers_seed(width: i32, height: i32) -> HashSet<(i32, i32)> {
+    let columns = (width / 13).clamp(1, 3);
+    let rows = (height / 10).clamp(1, 2);
+    let tile_width = width / columns;
+    let tile_height = height / rows;
 
-fn build_game_of_life_bloom_seed(width: i32, height: i32) -> HashSet<(i32, i32)> {
-    let lower_y = (i64::from(height) * 2 / 3) as i32 - 1;
-    vec![
-        (R_PENTOMINO, 1, 1),
-        (ACORN, (width / 2) - 3, (height / 3) - 1),
-        (R_PENTOMINO, width - 4, height - 4),
-        (R_PENTOMINO, (width / 2) - 1, lower_y),
-    ]
-    .into_iter()
-    .flat_map(|(shape, x, y)| place_shape(shape, width, height, x, y))
-    .collect()
+    (0..rows)
+        .flat_map(|row| {
+            (0..columns).flat_map(move |column| {
+                let x = column * tile_width + (tile_width - TUMBLER_CYCLE_ENVELOPE.0).max(0) / 2;
+                let y = row * tile_height + (tile_height - TUMBLER_CYCLE_ENVELOPE.1).max(0) / 2;
+                place_shape(TUMBLER, width, height, x, y)
+            })
+        })
+        .collect()
 }
 
 pub fn build_live_game_of_life_seed(
@@ -303,10 +298,9 @@ pub fn build_live_game_of_life_seed(
 ) -> HashSet<(i32, i32)> {
     let width = grid_dimension(game_of_life_grid_width(inner_width));
     let height = grid_dimension(game_of_life_grid_height(body_height));
-    match GameOfLifeVariant::from_style_name(style).unwrap_or(GameOfLifeVariant::Bloom) {
+    match GameOfLifeVariant::from_style_name(style).unwrap_or(GameOfLifeVariant::Gliders) {
         GameOfLifeVariant::Gliders => build_game_of_life_gliders_seed(width, height),
-        GameOfLifeVariant::Oscillators => build_game_of_life_oscillators_seed(width, height),
-        GameOfLifeVariant::Bloom => build_game_of_life_bloom_seed(width, height),
+        GameOfLifeVariant::Tumblers => build_game_of_life_tumblers_seed(width, height),
     }
 }
 
@@ -548,9 +542,42 @@ mod tests {
         assert!(step_game_of_life_cells(&extreme, 5, 5).is_empty());
         assert!(step_game_of_life_cells(&extreme, usize::MAX, usize::MAX).is_empty());
 
-        let seed = build_live_game_of_life_seed(usize::MAX, usize::MAX, "game_of_life_bloom");
+        let seed = build_live_game_of_life_seed(usize::MAX, usize::MAX, "game_of_life_tumblers");
         assert!(!seed.is_empty());
         assert!(seed.iter().all(|&(x, y)| x >= 0 && y >= 0));
+
+        for style in ["game_of_life_gliders", "game_of_life_tumblers"] {
+            let seed = build_live_game_of_life_seed(0, 0, style);
+            assert!(
+                seed.iter()
+                    .all(|&(x, y)| (0..1).contains(&x) && (0..3).contains(&y))
+            );
+        }
+    }
+
+    #[test]
+    fn game_of_life_tumblers_repeat_after_fourteen_generations_at_representative_sizes() {
+        for (inner_width, body_height) in [(22, 8), (80, 24), (160, 45)] {
+            let initial =
+                build_live_game_of_life_seed(inner_width, body_height, "game_of_life_tumblers");
+            let width = game_of_life_grid_width(inner_width);
+            let height = game_of_life_grid_height(body_height);
+            let mut cells = initial.clone();
+
+            assert!(initial.len() >= TUMBLER.len());
+            assert!(
+                initial
+                    .iter()
+                    .all(|&(x, y)| x >= 0 && x < width as i32 && y >= 0 && y < height as i32)
+            );
+            for generation in 1..=14 {
+                cells = step_game_of_life_cells(&cells, width, height);
+                if generation < 14 {
+                    assert_ne!(cells, initial);
+                }
+            }
+            assert_eq!(cells, initial);
+        }
     }
 
     // Defends: Game of Life obeys the shared frame-producer resize and advance contract.
