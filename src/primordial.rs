@@ -17,6 +17,7 @@ struct Particle {
     x: f64,
     y: f64,
     heading: f64,
+    neighbors: usize,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -35,7 +36,6 @@ impl Neighborhood {
 pub struct PrimordialAnimation {
     context: ScreenAnimationContext,
     particles: Vec<Particle>,
-    neighborhoods: Vec<Neighborhood>,
     order: Vec<usize>,
     random_seed: u64,
     field: HalfBlockField,
@@ -48,20 +48,21 @@ impl PrimordialAnimation {
         let world_height = pixel_height.max(1) as f64;
         let count = particle_count(context.inner_width, pixel_height);
         let mut random_seed = size_seed(context.inner_width, pixel_height, 0x5052_494D_4F52_4449);
-        let particles: Vec<_> = (0..count)
+        let mut particles: Vec<_> = (0..count)
             .map(|_| Particle {
                 x: unit_from_seed(&mut random_seed) * world_width,
                 y: unit_from_seed(&mut random_seed) * world_height,
                 heading: unit_from_seed(&mut random_seed) * TAU,
+                neighbors: 0,
             })
             .collect();
-        let neighborhoods = (0..count)
-            .map(|index| neighborhood(&particles, index, world_width, world_height))
-            .collect();
+        for index in 0..count {
+            particles[index].neighbors =
+                neighborhood(&particles, index, world_width, world_height).total();
+        }
         let mut animation = Self {
             context,
             particles,
-            neighborhoods,
             order: (0..count).collect(),
             random_seed,
             field: HalfBlockField::new(context.inner_width, pixel_height),
@@ -85,11 +86,11 @@ impl PrimordialAnimation {
         if width == 0 || pixel_height == 0 {
             return;
         }
-        for (particle, neighborhood) in self.particles.iter().zip(&self.neighborhoods) {
+        for particle in &self.particles {
             self.field.set(
                 particle.x as usize,
                 particle.y as usize,
-                Some(particle_color(neighborhood.total())),
+                Some(particle_color(particle.neighbors)),
             );
         }
     }
@@ -109,8 +110,8 @@ impl ScreenFrameProducer for PrimordialAnimation {
         // ponytail: O(n²) scans are capped at 1,200 particles; add a spatial grid only if cadence misses.
         for &index in &self.order {
             let sensed = neighborhood(&self.particles, index, world_width, world_height);
-            self.neighborhoods[index] = sensed;
             let particle = &mut self.particles[index];
+            particle.neighbors = sensed.total();
             particle.heading =
                 (particle.heading + turn_delta(sensed.left, sensed.right)).rem_euclid(TAU);
             particle.x = (particle.x + particle.heading.cos() * SPEED).rem_euclid(world_width);
@@ -208,13 +209,30 @@ mod tests {
     }
 
     #[test]
-    fn documented_turn_and_toroidal_offset_match_the_pps_model() {
-        assert!((turn_delta(0, 0) - std::f64::consts::PI).abs() < 1e-12);
+    fn documented_turn_and_neighborhood_match_the_pps_model() {
+        assert!((turn_delta(0, 0) - PI).abs() < 1e-12);
         assert!((turn_delta(2, 5) - (180.0_f64 + 17.0 * 7.0).to_radians()).abs() < 1e-12);
         assert!((turn_delta(5, 2) - (180.0_f64 - 17.0 * 7.0).to_radians()).abs() < 1e-12);
-        assert!((turn_delta(4, 4) - std::f64::consts::PI).abs() < 1e-12);
+        assert!((turn_delta(4, 4) - PI).abs() < 1e-12);
         assert_eq!(wrapped_offset(9.0, 10.0), -1.0);
         assert_eq!(wrapped_offset(-9.0, 10.0), 1.0);
+
+        let particle = |x, y| Particle {
+            x,
+            y,
+            heading: 0.0,
+            neighbors: 0,
+        };
+        let particles = [
+            particle(9.0, 5.0),
+            particle(1.0, 4.0),
+            particle(1.0, 6.0),
+            particle(8.0, 6.0),
+        ];
+        assert_eq!(
+            neighborhood(&particles, 0, 10.0, 10.0),
+            Neighborhood { left: 1, right: 2 }
+        );
     }
 
     #[test]
@@ -226,11 +244,14 @@ mod tests {
         assert_eq!(first.particles.len(), 320);
         assert_eq!(first, second);
 
-        let initial_dense = first
-            .neighborhoods
-            .iter()
-            .filter(|neighborhood| neighborhood.total() >= 13)
-            .count();
+        let dense_particle_count = |animation: &PrimordialAnimation| {
+            animation
+                .particles
+                .iter()
+                .filter(|particle| particle.neighbors >= 13)
+                .count()
+        };
+        let initial_dense = dense_particle_count(&first);
         let frame = first.render_frame();
         assert_eq!(frame.len(), 24);
         assert!(frame.iter().all(|line| visible_line_width(line) == 80));
@@ -247,11 +268,7 @@ mod tests {
             first.advance_frame();
             second.advance_frame();
             if let Some(checkpoint) = [75, 250, 750].iter().position(|&value| value == frame) {
-                dense_checkpoints[checkpoint] = first
-                    .neighborhoods
-                    .iter()
-                    .filter(|neighborhood| neighborhood.total() >= 13)
-                    .count();
+                dense_checkpoints[checkpoint] = dense_particle_count(&first);
             }
         }
 
@@ -265,7 +282,7 @@ mod tests {
         }));
         assert!(
             dense_checkpoints.iter().all(|&dense| dense > initial_dense),
-            "dense particle counts at 3, 10, and 30 seconds: {dense_checkpoints:?}"
+            "dense particle counts at frames 75, 250, and 750: {dense_checkpoints:?}"
         );
 
         first.resize(context(120, 40));
