@@ -2,10 +2,11 @@ use crate::random::system_random_index;
 use crate::{
     BoidsAnimation, BoidsVariant, FRIENDS_AND_ENEMIES_STYLE, FriendsAndEnemiesAnimation,
     GAME_OF_LIFE_RANDOM_STYLES, GameOfLifeAnimation, GameOfLifeCellStyle, MANDELBROT_STYLE,
-    MATRIX_STYLE, MandelbrotAnimation, MatrixAnimation, RawModeGuard, ScreenAnimationContext,
-    ScreenFrameProducer, center_frame_lines, center_text, enter_screen_mode, game_of_life_spec,
-    leave_screen_mode, mandelbrot_frame_delay, matrix_frame_delay, render_screen_frame,
-    terminal_height, terminal_width,
+    MATRIX_STYLE, MandelbrotAnimation, MatrixAnimation, PRIMORDIAL_STYLE, PrimordialAnimation,
+    RawModeGuard, ScreenAnimationContext, ScreenFrameProducer, center_frame_lines, center_text,
+    enter_screen_mode, game_of_life_spec, leave_screen_mode, mandelbrot_frame_delay,
+    matrix_frame_delay, primordial_frame_delay, render_screen_frame, terminal_height,
+    terminal_width,
 };
 use crossterm::event::{self, KeyCode, KeyEvent, KeyEventKind};
 use std::io::{self, Write};
@@ -23,6 +24,7 @@ pub const SCREEN_STYLES: &[&str] = &[
     "boids_predator",
     "boids_schools",
     FRIENDS_AND_ENEMIES_STYLE,
+    PRIMORDIAL_STYLE,
     MANDELBROT_STYLE,
     MATRIX_STYLE,
     "game_of_life_gliders",
@@ -34,6 +36,7 @@ pub const SCREEN_RANDOM_STYLES: &[&str] = &[
     "boids",
     "boids_predator",
     "boids_schools",
+    PRIMORDIAL_STYLE,
     MANDELBROT_STYLE,
     MATRIX_STYLE,
     "game_of_life_gliders",
@@ -53,6 +56,7 @@ enum AnimationStyle {
     Boids(BoidsVariant),
     GameOfLife(&'static str),
     FriendsAndEnemies,
+    Primordial,
     Mandelbrot,
     Matrix,
 }
@@ -61,6 +65,7 @@ const ANIMATION_STYLES: &[AnimationStyle] = &[
     AnimationStyle::Boids(BoidsVariant::Predator),
     AnimationStyle::Boids(BoidsVariant::Schools),
     AnimationStyle::FriendsAndEnemies,
+    AnimationStyle::Primordial,
     AnimationStyle::Mandelbrot,
     AnimationStyle::Matrix,
     AnimationStyle::GameOfLife(GAME_OF_LIFE_RANDOM_STYLES[0]),
@@ -218,6 +223,9 @@ fn resolve_style(
     }
     if normalized == FRIENDS_AND_ENEMIES_STYLE {
         return Ok(ScreenStyle::Animation(AnimationStyle::FriendsAndEnemies));
+    }
+    if normalized == PRIMORDIAL_STYLE {
+        return Ok(ScreenStyle::Animation(AnimationStyle::Primordial));
     }
     if normalized == MATRIX_STYLE {
         return Ok(ScreenStyle::Animation(AnimationStyle::Matrix));
@@ -378,6 +386,7 @@ fn build_animation(
             Box::new(GameOfLifeAnimation::new(style_name, context, cell_style))
         }
         AnimationStyle::FriendsAndEnemies => Box::new(FriendsAndEnemiesAnimation::new(context)),
+        AnimationStyle::Primordial => Box::new(PrimordialAnimation::new(context)),
         AnimationStyle::Mandelbrot => Box::new(MandelbrotAnimation::new(context)),
         AnimationStyle::Matrix => Box::new(MatrixAnimation::new(context)),
     }
@@ -388,6 +397,7 @@ fn context_for_style(style: AnimationStyle, width: usize, height: usize) -> Scre
         AnimationStyle::GameOfLife(_) => game_of_life_context(width, height),
         AnimationStyle::Boids(_)
         | AnimationStyle::FriendsAndEnemies
+        | AnimationStyle::Primordial
         | AnimationStyle::Mandelbrot
         | AnimationStyle::Matrix => full_screen_context(width, height),
     }
@@ -417,6 +427,7 @@ fn frame_delay(style: AnimationStyle) -> Duration {
     match style {
         AnimationStyle::Boids(_) => Duration::from_millis(70),
         AnimationStyle::FriendsAndEnemies => Duration::from_millis(55),
+        AnimationStyle::Primordial => primordial_frame_delay(),
         AnimationStyle::Mandelbrot => mandelbrot_frame_delay(),
         AnimationStyle::Matrix => matrix_frame_delay(),
         AnimationStyle::GameOfLife(_) => Duration::from_millis(160),
@@ -706,6 +717,7 @@ mod tests {
                 AnimationStyle::Boids(BoidsVariant::Predator),
                 AnimationStyle::Boids(BoidsVariant::Schools),
                 AnimationStyle::FriendsAndEnemies,
+                AnimationStyle::Primordial,
                 AnimationStyle::Mandelbrot,
                 AnimationStyle::Matrix,
                 AnimationStyle::GameOfLife(GAME_OF_LIFE_RANDOM_STYLES[0]),

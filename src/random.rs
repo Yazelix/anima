@@ -12,6 +12,7 @@ const RANDOM_ANIMATION_FAMILIES: &[&[&str]] = &[
     BOIDS_RANDOM_STYLES,
     &[MANDELBROT_STYLE],
     &[crate::matrix::MATRIX_STYLE],
+    &[crate::primordial::PRIMORDIAL_STYLE],
 ];
 
 pub fn random_animation_slot_count() -> usize {
@@ -96,6 +97,7 @@ mod tests {
         let mut boids_count = 0;
         let mut mandelbrot_count = 0;
         let mut matrix_count = 0;
+        let mut primordial_count = 0;
 
         for index in 0..random_animation_slot_count() {
             match resolve_random_animation_style(Some(index)) {
@@ -103,6 +105,7 @@ mod tests {
                 style if BOIDS_RANDOM_STYLES.contains(&style) => boids_count += 1,
                 MANDELBROT_STYLE => mandelbrot_count += 1,
                 crate::matrix::MATRIX_STYLE => matrix_count += 1,
+                crate::primordial::PRIMORDIAL_STYLE => primordial_count += 1,
                 other => panic!("unexpected random style {other}"),
             }
         }
@@ -111,5 +114,6 @@ mod tests {
         assert_eq!(boids_count, 6);
         assert_eq!(mandelbrot_count, 6);
         assert_eq!(matrix_count, 6);
+        assert_eq!(primordial_count, 6);
     }
 }

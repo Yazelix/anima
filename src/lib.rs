@@ -6,6 +6,7 @@ mod game_of_life;
 mod kitty_frames;
 mod mandelbrot;
 mod matrix;
+mod primordial;
 mod random;
 mod screen_runner;
 mod terminal_control;
@@ -34,6 +35,7 @@ pub use mandelbrot::{
     mandelbrot_max_iterations,
 };
 pub use matrix::{MATRIX_STYLE, MatrixAnimation, matrix_frame_delay};
+pub use primordial::{PRIMORDIAL_STYLE, PrimordialAnimation, primordial_frame_delay};
 pub use random::{
     BOIDS_RANDOM_STYLES, GAME_OF_LIFE_RANDOM_STYLES, MANDELBROT_STYLE, random_animation_slot_count,
     random_animation_styles, resolve_random_animation_style,

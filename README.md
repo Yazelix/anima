@@ -11,13 +11,14 @@ nix run github:Yazelix/anima#yzs -- static
 nix run github:Yazelix/anima#yzs -- asciiquarium --duration-seconds 3
 nix run github:Yazelix/anima#yzs -- mandelbrot
 nix run github:Yazelix/anima#yzs -- friends_and_enemies
+nix run github:Yazelix/anima#yzs -- primordial
 nix run github:Yazelix/anima#yzs -- game_of_life_bloom --cell-style dotted
 nix run github:Yazelix/anima#yzs -- random --duration-seconds 3
 ```
 
 ## What It Contains
 
-- Animation engines for Boids, friends and enemies, Mandelbrot, Matrix rain, and Game of Life
+- Animation engines for Boids, friends and enemies, Primordial Particle Systems, Mandelbrot, Matrix rain, and Game of Life
 - The separately packaged `asciiquarium-rs` terminal aquarium
 - Static and logo-style Yazelix welcome screens
 - File-backed Kitty PNG frame sequence rendering
@@ -45,6 +46,9 @@ Special thanks to:
 - [Simon Whiteley](https://www.wired.com/story/the-matrix-code-sushi-recipe/),
   who designed the digital rain for *The Matrix*. It inspires Anima's Matrix
   animation.
+- [Thomas Schmickl, Martin Stefanec, and Karl Crailsheim](https://www.nature.com/articles/srep37969),
+  who introduced the Primordial Particle System motion law. It inspires Anima's
+  Primordial animation.
 
 ## User Command
 
@@ -56,6 +60,7 @@ yzs
 yzs static
 yzs asciiquarium --duration-seconds 3
 yzs friends_and_enemies --duration-seconds 3
+yzs primordial --duration-seconds 3
 yzs mandelbrot
 yzs game_of_life_bloom --cell-style dotted
 yzs random --duration-seconds 3
@@ -77,6 +82,7 @@ cargo run --bin yzs -- --help
 cargo run --bin yzs -- static
 cargo run --bin yzs -- asciiquarium --duration-seconds 3
 cargo run --bin yzs -- friends_and_enemies --duration-seconds 3
+cargo run --bin yzs -- primordial --duration-seconds 3
 cargo run --bin yzs -- mandelbrot
 cargo run --bin yzs -- game_of_life_bloom --cell-style dotted
 cargo run --bin yzs -- random --duration-seconds 3
@@ -93,6 +99,7 @@ nix run .#yzs -- --help
 nix run .#yzs -- static
 nix run .#yzs -- asciiquarium --duration-seconds 3
 nix run .#yzs -- friends_and_enemies --duration-seconds 3
+nix run .#yzs -- primordial --duration-seconds 3
 nix run .#yzs -- mandelbrot
 nix run .#yzs -- random --duration-seconds 3
 ```
@@ -106,6 +113,7 @@ Supported styles:
 - `boids_predator`
 - `boids_schools`
 - `friends_and_enemies`
+- `primordial`
 - `mandelbrot`
 - `matrix`
 - `game_of_life_gliders`
@@ -147,6 +155,7 @@ cargo run --example play_style -- mandelbrot 90
 cargo run --example play_style -- matrix 90
 cargo run --example play_style -- boids_schools 120
 cargo run --example play_style -- friends_and_enemies 90
+cargo run --example play_style -- primordial 180
 cargo run --example play_style -- game_of_life_gliders 80
 ```
 
