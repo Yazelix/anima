@@ -26,6 +26,26 @@ nix run github:Yazelix/anima#yzs -- random --duration-seconds 3
 - A standalone `yzs` binary with interactive and timed playback
 - Small examples for library consumers
 
+## Special Thanks
+
+Special thanks to:
+
+- [Craig Reynolds](https://www.red3d.com/cwr/), who created
+  [Boids](https://www.red3d.com/cwr/boids/) in 1986. Its separation, alignment,
+  and cohesion rules inspire Anima's Boids animations.
+- [John Horton Conway](https://mathshistory.st-andrews.ac.uk/Biographies/Conway/),
+  who invented the Game of Life in 1970. His cellular automaton inspires
+  Anima's Game of Life animations.
+- [Simon Woods](https://community.wolfram.com/groups/-/m/t/122095), who
+  published the friends-and-enemies particle dance. Its update rule inspires
+  Anima's dense particle animation.
+- [Benoît Mandelbrot](https://news.yale.edu/2010/10/18/memoriam-benoit-mandelbrot),
+  whose pioneering fractal work led to the Mandelbrot set. It inspires Anima's
+  Mandelbrot animation.
+- [Simon Whiteley](https://www.wired.com/story/the-matrix-code-sushi-recipe/),
+  who designed the digital rain for *The Matrix*. It inspires Anima's Matrix
+  animation.
+
 ## User Command
 
 Installed standalone command:
@@ -103,10 +123,14 @@ Random chooses from the dogfooded animated styles. `static`, `logo`, and
 
 The aquarium runs as a separate
 [`asciiquarium-rs`](https://github.com/cablehead/asciiquarium-rs) process under
-its GPL-2.0-or-later license. `yzs` supplies the same any-key exit and optional
-duration contract used by its native styles without copying or linking the
-aquarium implementation. The packaged upstream revision exits cleanly when its
-terminal disappears, so closing the containing terminal cannot orphan it
+its GPL-2.0-or-later license. Its upstream [credit and
+lineage](https://github.com/cablehead/asciiquarium-rs#credit-and-lineage) section
+traces it to Kirk Baucom's original Perl program, Joan Stark's ASCII art,
+Claudio Matsuoka's additions, and `cablehead`'s Rust port. `yzs` supplies the same
+any-key exit and optional duration contract used by its native styles without
+copying or linking the aquarium implementation. The packaged upstream revision
+exits cleanly when its terminal disappears, so closing the containing terminal
+cannot orphan it
 
 ## Library Examples
 
