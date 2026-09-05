@@ -10,7 +10,7 @@ Only Anima-specific guidance belongs here.
 ## Local Scope
 
 - This repo owns Anima's standalone `yzs` terminal animation engine and Rust crate.
-- Main Yazelix owns integrated welcome/session policy and the `yzx screen` command surface.
+- Nova owns integrated welcome/session policy and the `yzx anima` command surface.
 - Keep renderer behavior usable from a plain terminal without a Yazelix session.
 
 ## Local Commands

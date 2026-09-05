@@ -148,20 +148,17 @@ mod tests {
         let mut animation = ChladniAnimation::new(context(48, 24));
         let initial = animation.render_frame();
         let mut previous_mean: Option<f64> = None;
-        for frame in 0..MODE_FRAMES * MODES.len() {
-            let colors: Vec<_> = animation
-                .pixels
-                .cells
-                .iter()
-                .flatten()
-                .copied()
-                .flatten()
-                .collect();
-            assert_eq!(colors.len(), 48 * 48);
-            assert!(colors.iter().filter(|color| color.red > 120).count() > colors.len() / 100);
-            assert!(colors.iter().filter(|color| color.red < 60).count() > colors.len() / 5);
-            let mean =
-                colors.iter().map(|color| color.red as f64).sum::<f64>() / colors.len() as f64;
+        // Include the wrap back to frame zero in the adjacent-frame brightness check.
+        for frame in 0..=MODE_FRAMES * MODES.len() {
+            if frame > 0 {
+                animation.advance_frame();
+            }
+            let colors = animation.pixels.cells.iter().flatten().flatten();
+            let pixel_count = colors.clone().count();
+            assert_eq!(pixel_count, 48 * 48);
+            assert!(colors.clone().filter(|color| color.red > 120).count() > pixel_count / 100);
+            assert!(colors.clone().filter(|color| color.red < 60).count() > pixel_count / 5);
+            let mean = colors.map(|color| color.red as f64).sum::<f64>() / pixel_count as f64;
             if let Some(previous) = previous_mean {
                 assert!(
                     (mean - previous).abs() < 5.0,
@@ -172,7 +169,6 @@ mod tests {
             if frame % MODE_FRAMES == MODE_FRAMES / 2 {
                 assert_ne!(initial, animation.render_frame());
             }
-            animation.advance_frame();
         }
         assert_eq!(animation.render_frame(), initial);
 
