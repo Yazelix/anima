@@ -122,8 +122,9 @@ fn install_termination_handlers() -> Result<(), String> {
     TERMINATED
         .get_or_init(|| {
             let stopped = Arc::new(AtomicBool::new(false));
-            for signal in signal_hook::consts::TERM_SIGNALS {
-                signal_hook::flag::register(*signal, Arc::clone(&stopped))
+            use signal_hook::consts::{SIGHUP, SIGINT, SIGTERM};
+            for signal in [SIGHUP, SIGINT, SIGTERM] {
+                signal_hook::flag::register(signal, Arc::clone(&stopped))
                     .map_err(|error| format!("could not handle terminal shutdown: {error}"))?;
             }
             Ok(stopped)
@@ -1220,7 +1221,7 @@ mod tests {
             install_termination_handlers().unwrap();
         }
         let mut command = fake(if terminate {
-            r#"printf '%s' "$$"; kill -TERM "$PPID"; exec sleep 2"#
+            r#"printf '%s' "$$"; kill "-$ANIMA_TEST_TERMINATE" "$PPID"; exec sleep 2"#
         } else {
             r#"printf '%s' "$$"; exec sleep 30"#
         });
@@ -1249,22 +1250,24 @@ mod tests {
         );
         if !terminate {
             // Isolate the real termination signal from the parallel test harness.
-            let mut command = fake(
-                r#"exec "$ANIMA_TEST_EXE" --exact screen_runner::tests::aquarium_outcomes_deadline_and_reaping"#,
-            );
-            command
-                .env("ANIMA_TEST_EXE", std::env::current_exe().unwrap())
-                .env("ANIMA_TEST_TERMINATE", "1")
-                .stdout(Stdio::null());
-            let started = Instant::now();
-            assert_eq!(
-                run_asciiquarium(command, Some((started, Duration::from_secs(2)))).unwrap(),
-                InputAction::Exit
-            );
-            assert!(
-                started.elapsed() < Duration::from_secs(1),
-                "termination was not handled"
-            );
+            for signal in ["TERM", "HUP", "INT"] {
+                let mut command = fake(
+                    r#"exec "$ANIMA_TEST_EXE" --exact screen_runner::tests::aquarium_outcomes_deadline_and_reaping"#,
+                );
+                command
+                    .env("ANIMA_TEST_EXE", std::env::current_exe().unwrap())
+                    .env("ANIMA_TEST_TERMINATE", signal)
+                    .stdout(Stdio::null());
+                let started = Instant::now();
+                assert_eq!(
+                    run_asciiquarium(command, Some((started, Duration::from_secs(2)))).unwrap(),
+                    InputAction::Exit
+                );
+                assert!(
+                    started.elapsed() < Duration::from_secs(1),
+                    "termination was not handled"
+                );
+            }
         }
     }
 
