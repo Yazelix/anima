@@ -15,13 +15,14 @@ nix run github:Yazelix/anima#yzs -- mandelbrot
 nix run github:Yazelix/anima#yzs -- friends_and_enemies
 nix run github:Yazelix/anima#yzs -- primordial
 nix run github:Yazelix/anima#yzs -- physarum
+nix run github:Yazelix/anima#yzs -- chladni
 nix run github:Yazelix/anima#yzs -- game_of_life_tumblers --cell-style dotted
 nix run github:Yazelix/anima#yzs -- random --duration-seconds 3
 ```
 
 ## What It Contains
 
-- Animation engines for Boids, friends and enemies, Primordial Particle Systems, Physarum trail networks, Mandelbrot, Matrix rain, and Game of Life
+- Animation engines for Boids, friends and enemies, Primordial Particle Systems, Physarum trail networks, Chladni nodal patterns, Mandelbrot, Matrix rain, and Game of Life
 - The separately packaged `asciiquarium-rs` terminal aquarium
 - Static and logo-style Yazelix welcome screens
 - File-backed Kitty PNG frame sequence rendering
@@ -54,6 +55,8 @@ Special thanks to:
   Primordial animation.
 - [Jeff Jones](https://doi.org/10.1162/artl.2010.16.2.16202), whose particle model
   of Physarum transport networks inspires Anima's trail-network animation.
+- [Paul Bourke](https://www.paulbourke.net/geometry/chladni/), who documents the
+  Chladni nodal equations used in Anima's geometric animation.
 
 ## User Command
 
@@ -67,6 +70,7 @@ yzs asciiquarium --duration-seconds 3
 yzs friends_and_enemies --duration-seconds 3
 yzs primordial --duration-seconds 3
 yzs physarum --duration-seconds 3
+yzs chladni --duration-seconds 3
 yzs mandelbrot
 yzs game_of_life_tumblers --cell-style dotted
 yzs random --duration-seconds 3
@@ -90,6 +94,7 @@ cargo run --bin yzs -- asciiquarium --duration-seconds 3
 cargo run --bin yzs -- friends_and_enemies --duration-seconds 3
 cargo run --bin yzs -- primordial --duration-seconds 3
 cargo run --bin yzs -- physarum --duration-seconds 3
+cargo run --bin yzs -- chladni --duration-seconds 3
 cargo run --bin yzs -- mandelbrot
 cargo run --bin yzs -- game_of_life_tumblers --cell-style dotted
 cargo run --bin yzs -- random --duration-seconds 3
@@ -108,6 +113,7 @@ nix run .#yzs -- asciiquarium --duration-seconds 3
 nix run .#yzs -- friends_and_enemies --duration-seconds 3
 nix run .#yzs -- primordial --duration-seconds 3
 nix run .#yzs -- physarum --duration-seconds 3
+nix run .#yzs -- chladni --duration-seconds 3
 nix run .#yzs -- mandelbrot
 nix run .#yzs -- random --duration-seconds 3
 ```
@@ -123,6 +129,7 @@ Supported styles:
 - `friends_and_enemies`
 - `primordial`
 - `physarum`
+- `chladni`
 - `mandelbrot`
 - `matrix`
 - `game_of_life_gliders`
@@ -136,13 +143,19 @@ In native animations, `Left`/`h`/`p` selects the previous style and
 
 Random chooses from the dogfooded animated styles. `static`, `logo`, and
 `friends_and_enemies` remain explicitly selectable but outside that pool.
-`physarum` is available by name and through native browsing; it stays outside
-random selection pending integrated Nova dogfooding
+`physarum` and `chladni` are available by name and through native browsing;
+they stay outside random selection pending integrated Nova dogfooding
 
 In `physarum`, agents follow and deposit trails that diffuse into branching
 networks. The animation uses truecolor half blocks, a 6,000-agent ceiling, and
 the shared duration, input, and resize handling. It adds no dependency. This is
 a visual approximation of Jones's model, without biological-fidelity claims
+
+In `chladni`, five standing-wave mode pairs blend through a 36-second loop.
+Warm nodal lines separate blue and violet regions on an opaque background.
+The animation uses square half-block samples under the 2:1 terminal-cell
+convention, cached cosine terms, and a fixed palette of at most 64 colors.
+It is a visual approximation of plate patterns, not an acoustic simulation
 
 The aquarium runs as a separate
 [`asciiquarium-rs`](https://github.com/cablehead/asciiquarium-rs) process under
@@ -172,6 +185,7 @@ cargo run --example play_style -- boids_schools 120
 cargo run --example play_style -- friends_and_enemies 90
 cargo run --example play_style -- primordial 180
 cargo run --example play_style -- physarum 180
+cargo run --example play_style -- chladni 180
 cargo run --example play_style -- game_of_life_gliders 80
 ```
 

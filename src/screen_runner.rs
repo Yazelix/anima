@@ -1,12 +1,13 @@
 use crate::random::system_random_index;
 use crate::{
-    BoidsAnimation, BoidsVariant, FRIENDS_AND_ENEMIES_STYLE, FriendsAndEnemiesAnimation,
-    GAME_OF_LIFE_RANDOM_STYLES, GameOfLifeAnimation, GameOfLifeCellStyle, MANDELBROT_STYLE,
-    MATRIX_STYLE, MandelbrotAnimation, MatrixAnimation, PHYSARUM_STYLE, PRIMORDIAL_STYLE,
-    PhysarumAnimation, PrimordialAnimation, RawModeGuard, ScreenAnimationContext,
-    ScreenFrameProducer, center_frame_lines, center_text, enter_screen_mode, game_of_life_spec,
-    leave_screen_mode, mandelbrot_frame_delay, matrix_frame_delay, physarum_frame_delay,
-    primordial_frame_delay, render_screen_frame, terminal_height, terminal_width,
+    BoidsAnimation, BoidsVariant, CHLADNI_STYLE, ChladniAnimation, FRIENDS_AND_ENEMIES_STYLE,
+    FriendsAndEnemiesAnimation, GAME_OF_LIFE_RANDOM_STYLES, GameOfLifeAnimation,
+    GameOfLifeCellStyle, MANDELBROT_STYLE, MATRIX_STYLE, MandelbrotAnimation, MatrixAnimation,
+    PHYSARUM_STYLE, PRIMORDIAL_STYLE, PhysarumAnimation, PrimordialAnimation, RawModeGuard,
+    ScreenAnimationContext, ScreenFrameProducer, center_frame_lines, center_text,
+    chladni_frame_delay, enter_screen_mode, game_of_life_spec, leave_screen_mode,
+    mandelbrot_frame_delay, matrix_frame_delay, physarum_frame_delay, primordial_frame_delay,
+    render_screen_frame, terminal_height, terminal_width,
 };
 use crossterm::event::{self, KeyCode, KeyEvent, KeyEventKind};
 use std::io::{self, Write};
@@ -26,6 +27,7 @@ pub const SCREEN_STYLES: &[&str] = &[
     FRIENDS_AND_ENEMIES_STYLE,
     PRIMORDIAL_STYLE,
     PHYSARUM_STYLE,
+    CHLADNI_STYLE,
     MANDELBROT_STYLE,
     MATRIX_STYLE,
     "game_of_life_gliders",
@@ -57,6 +59,7 @@ enum AnimationStyle {
     FriendsAndEnemies,
     Primordial,
     Physarum,
+    Chladni,
     Mandelbrot,
     Matrix,
 }
@@ -67,6 +70,7 @@ const ANIMATION_STYLES: &[AnimationStyle] = &[
     AnimationStyle::FriendsAndEnemies,
     AnimationStyle::Primordial,
     AnimationStyle::Physarum,
+    AnimationStyle::Chladni,
     AnimationStyle::Mandelbrot,
     AnimationStyle::Matrix,
     AnimationStyle::GameOfLife(GAME_OF_LIFE_RANDOM_STYLES[0]),
@@ -230,6 +234,9 @@ fn resolve_style(
     if normalized == PHYSARUM_STYLE {
         return Ok(ScreenStyle::Animation(AnimationStyle::Physarum));
     }
+    if normalized == CHLADNI_STYLE {
+        return Ok(ScreenStyle::Animation(AnimationStyle::Chladni));
+    }
     if normalized == MATRIX_STYLE {
         return Ok(ScreenStyle::Animation(AnimationStyle::Matrix));
     }
@@ -391,6 +398,7 @@ fn build_animation(
         AnimationStyle::FriendsAndEnemies => Box::new(FriendsAndEnemiesAnimation::new(context)),
         AnimationStyle::Primordial => Box::new(PrimordialAnimation::new(context)),
         AnimationStyle::Physarum => Box::new(PhysarumAnimation::new(context)),
+        AnimationStyle::Chladni => Box::new(ChladniAnimation::new(context)),
         AnimationStyle::Mandelbrot => Box::new(MandelbrotAnimation::new(context)),
         AnimationStyle::Matrix => Box::new(MatrixAnimation::new(context)),
     }
@@ -403,6 +411,7 @@ fn context_for_style(style: AnimationStyle, width: usize, height: usize) -> Scre
         | AnimationStyle::FriendsAndEnemies
         | AnimationStyle::Primordial
         | AnimationStyle::Physarum
+        | AnimationStyle::Chladni
         | AnimationStyle::Mandelbrot
         | AnimationStyle::Matrix => full_screen_context(width, height),
     }
@@ -434,6 +443,7 @@ fn frame_delay(style: AnimationStyle) -> Duration {
         AnimationStyle::FriendsAndEnemies => Duration::from_millis(55),
         AnimationStyle::Primordial => primordial_frame_delay(),
         AnimationStyle::Physarum => physarum_frame_delay(),
+        AnimationStyle::Chladni => chladni_frame_delay(),
         AnimationStyle::Mandelbrot => mandelbrot_frame_delay(),
         AnimationStyle::Matrix => matrix_frame_delay(),
         AnimationStyle::GameOfLife(_) => Duration::from_millis(160),
@@ -695,6 +705,20 @@ mod tests {
             .render_frame(),
             PhysarumAnimation::new(full_screen_context(40, 12)).render_frame()
         );
+        assert!(matches!(
+            resolve_style(" CHLADNI ", None, "yzs"),
+            Ok(ScreenStyle::Animation(AnimationStyle::Chladni))
+        ));
+        assert_eq!(
+            build_animation(
+                AnimationStyle::Chladni,
+                40,
+                12,
+                GameOfLifeCellStyle::FullBlock
+            )
+            .render_frame(),
+            ChladniAnimation::new(full_screen_context(40, 12)).render_frame()
+        );
         for style in ["game_of_life_oscillators", "game_of_life_bloom"] {
             assert!(resolve_style(style, None, "yzs").is_err());
         }
@@ -708,6 +732,7 @@ mod tests {
             LOGO_STYLE,
             FRIENDS_AND_ENEMIES_STYLE,
             PHYSARUM_STYLE,
+            CHLADNI_STYLE,
         ] {
             assert!(!SCREEN_RANDOM_STYLES.contains(&style));
             assert!(!crate::random_animation_styles().contains(&style));
@@ -748,6 +773,7 @@ mod tests {
                 AnimationStyle::FriendsAndEnemies,
                 AnimationStyle::Primordial,
                 AnimationStyle::Physarum,
+                AnimationStyle::Chladni,
                 AnimationStyle::Mandelbrot,
                 AnimationStyle::Matrix,
                 AnimationStyle::GameOfLife(GAME_OF_LIFE_RANDOM_STYLES[0]),

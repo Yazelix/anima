@@ -1,6 +1,7 @@
 //! Terminal screen primitives shared by Yazelix front-door animation surfaces.
 
 mod boids;
+mod chladni;
 mod friends_and_enemies;
 mod game_of_life;
 mod kitty_frames;
@@ -17,6 +18,7 @@ use crossterm::terminal;
 use std::io::{self, Write};
 
 pub use boids::{BoidsAnimation, BoidsVariant, is_boids_style};
+pub use chladni::{CHLADNI_STYLE, ChladniAnimation, chladni_frame_delay};
 pub use friends_and_enemies::{FRIENDS_AND_ENEMIES_STYLE, FriendsAndEnemiesAnimation};
 pub use game_of_life::{
     GameOfLifeAnimation, GameOfLifeCellStyle, GameOfLifeCellStyleParseError, GameOfLifeScreenState,

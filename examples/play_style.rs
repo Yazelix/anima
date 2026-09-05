@@ -1,13 +1,14 @@
 use std::{io, thread, time::Duration};
 
 use yazelix_screen::{
-    BoidsAnimation, BoidsVariant, FRIENDS_AND_ENEMIES_STYLE, FriendsAndEnemiesAnimation,
-    GAME_OF_LIFE_RANDOM_STYLES, GameOfLifeAnimation, GameOfLifeCellStyle, MANDELBROT_STYLE,
-    MATRIX_STYLE, MandelbrotAnimation, MatrixAnimation, PHYSARUM_STYLE, PRIMORDIAL_STYLE,
-    PhysarumAnimation, PrimordialAnimation, ScreenAnimationContext, ScreenFrameProducer,
-    enter_screen_mode, game_of_life_spec, leave_screen_mode, mandelbrot_frame_delay,
-    matrix_frame_delay, physarum_frame_delay, primordial_frame_delay, render_screen_frame,
-    terminal_height, terminal_width,
+    BoidsAnimation, BoidsVariant, CHLADNI_STYLE, ChladniAnimation, FRIENDS_AND_ENEMIES_STYLE,
+    FriendsAndEnemiesAnimation, GAME_OF_LIFE_RANDOM_STYLES, GameOfLifeAnimation,
+    GameOfLifeCellStyle, MANDELBROT_STYLE, MATRIX_STYLE, MandelbrotAnimation, MatrixAnimation,
+    PHYSARUM_STYLE, PRIMORDIAL_STYLE, PhysarumAnimation, PrimordialAnimation,
+    ScreenAnimationContext, ScreenFrameProducer, chladni_frame_delay, enter_screen_mode,
+    game_of_life_spec, leave_screen_mode, mandelbrot_frame_delay, matrix_frame_delay,
+    physarum_frame_delay, primordial_frame_delay, render_screen_frame, terminal_height,
+    terminal_width,
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -19,6 +20,7 @@ enum ExampleStyle {
     Matrix,
     Primordial,
     Physarum,
+    Chladni,
 }
 
 struct ScreenModeGuard;
@@ -78,6 +80,9 @@ fn resolve_style(raw: &str) -> Result<ExampleStyle, io::Error> {
     if normalized == PHYSARUM_STYLE {
         return Ok(ExampleStyle::Physarum);
     }
+    if normalized == CHLADNI_STYLE {
+        return Ok(ExampleStyle::Chladni);
+    }
     if let Some(style) = GAME_OF_LIFE_RANDOM_STYLES
         .iter()
         .find(|candidate| **candidate == normalized)
@@ -89,7 +94,7 @@ fn resolve_style(raw: &str) -> Result<ExampleStyle, io::Error> {
     Err(io::Error::new(
         io::ErrorKind::InvalidInput,
         format!(
-            "unsupported style `{normalized}`; expected boids, boids_predator, boids_schools, friends_and_enemies, primordial, physarum, mandelbrot, matrix, game_of_life_gliders, or game_of_life_tumblers"
+            "unsupported style `{normalized}`; expected boids, boids_predator, boids_schools, friends_and_enemies, primordial, physarum, chladni, mandelbrot, matrix, game_of_life_gliders, or game_of_life_tumblers"
         ),
     ))
 }
@@ -112,6 +117,7 @@ fn build_animation(style: ExampleStyle) -> Box<dyn ScreenFrameProducer> {
         ExampleStyle::Matrix => Box::new(MatrixAnimation::new(context)),
         ExampleStyle::Primordial => Box::new(PrimordialAnimation::new(context)),
         ExampleStyle::Physarum => Box::new(PhysarumAnimation::new(context)),
+        ExampleStyle::Chladni => Box::new(ChladniAnimation::new(context)),
     }
 }
 
@@ -126,6 +132,7 @@ fn context_for_style(style: ExampleStyle, width: usize, height: usize) -> Screen
         | ExampleStyle::FriendsAndEnemies
         | ExampleStyle::Primordial
         | ExampleStyle::Physarum
+        | ExampleStyle::Chladni
         | ExampleStyle::Mandelbrot
         | ExampleStyle::Matrix => width,
     };
@@ -158,6 +165,7 @@ fn frame_delay(style: ExampleStyle) -> Duration {
         ExampleStyle::Matrix => matrix_frame_delay(),
         ExampleStyle::Primordial => primordial_frame_delay(),
         ExampleStyle::Physarum => physarum_frame_delay(),
+        ExampleStyle::Chladni => chladni_frame_delay(),
         ExampleStyle::GameOfLife(_) => Duration::from_millis(160),
     }
 }
