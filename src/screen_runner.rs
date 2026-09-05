@@ -10,6 +10,7 @@ use crate::{
     render_screen_frame, terminal_height, terminal_width,
 };
 use crossterm::event::{self, KeyCode, KeyEvent, KeyEventKind};
+use std::fmt::Write as _;
 use std::io::{self, Write};
 use std::process::Command;
 use std::time::{Duration, Instant};
@@ -76,6 +77,10 @@ const ANIMATION_STYLES: &[AnimationStyle] = &[
     AnimationStyle::GameOfLife(GAME_OF_LIFE_RANDOM_STYLES[0]),
     AnimationStyle::GameOfLife(GAME_OF_LIFE_RANDOM_STYLES[1]),
 ];
+
+const BROWSE_HINT: &str = "←/h previous · l/→ next";
+const CARD_LIFETIME: Duration = Duration::from_secs(4);
+const CARD_FRAME_DELAY: Duration = Duration::from_millis(33);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum InputAction {
@@ -340,16 +345,39 @@ fn run_animation(
     let mut height = terminal_height();
     let mut animation = build_animation(style, width, height, cell_style);
     let mut cadence = frame_delay(style);
+    let mut frame = animation.render_frame();
+    let mut card_started = Instant::now();
+    let mut next_frame = card_started + cadence;
+    let card_lifetime = || {
+        timing.map_or(CARD_LIFETIME, |(started, duration)| {
+            CARD_LIFETIME.min(duration.saturating_sub(started.elapsed()))
+        })
+    };
+    let mut lifetime = card_lifetime();
 
     loop {
         if timing.is_some_and(|(started, duration)| started.elapsed() >= duration) {
             return Ok(());
         }
 
-        render_screen_frame(&animation.render_frame())
+        // Presentation ticks do not advance the simulation. Cache its last frame
+        // so slow styles can fade smoothly without extra simulation/render work.
+        if Instant::now() >= next_frame {
+            animation.advance_frame();
+            frame = animation.render_frame();
+            next_frame = Instant::now() + cadence;
+        }
+        let elapsed = card_started.elapsed();
+        let (intensity, card_delay) = card_timing(elapsed, lifetime);
+        let card = identity_card(style, width, height, intensity);
+        crate::terminal_control::render_screen_frame(&mut io::stdout().lock(), &frame, &card)
             .map_err(|error| format!("could not render screen frame: {error}"))?;
-        let delay = timing.map_or(cadence, |(started, duration)| {
-            cadence.min(duration.saturating_sub(started.elapsed()))
+        let mut delay = next_frame.saturating_duration_since(Instant::now());
+        if !card.is_empty() {
+            delay = delay.min(card_delay);
+        }
+        let delay = timing.map_or(delay, |(started, duration)| {
+            delay.min(duration.saturating_sub(started.elapsed()))
         });
         let action = poll_for_input(delay)?;
         let current = (terminal_width(), terminal_height());
@@ -360,14 +388,127 @@ fn run_animation(
                 (width, height) = current;
                 animation = build_animation(style, width, height, cell_style);
                 cadence = frame_delay(style);
+                frame = animation.render_frame();
+                card_started = Instant::now();
+                lifetime = card_lifetime();
+                next_frame = card_started + cadence;
             }
             None if current != (width, height) => {
                 (width, height) = current;
                 animation.resize(context_for_style(style, width, height));
+                frame = animation.render_frame();
             }
-            None => animation.advance_frame(),
+            None => {}
         }
     }
+}
+
+// Attribution sources and the distinction between models and visual adaptations
+// live in README's Special Thanks section. These credits name the original role,
+// not authorship of Anima's Rust implementation.
+fn animation_credit(style: AnimationStyle) -> (&'static str, &'static str) {
+    match style {
+        AnimationStyle::Boids(BoidsVariant::Predator) => {
+            ("Boids: Predator", "Model by Craig Reynolds")
+        }
+        AnimationStyle::Boids(BoidsVariant::Schools) => {
+            ("Boids: Schools", "Model by Craig Reynolds")
+        }
+        AnimationStyle::GameOfLife("game_of_life_gliders") => {
+            ("Game of Life: Gliders", "Created by John Conway")
+        }
+        AnimationStyle::GameOfLife("game_of_life_tumblers") => {
+            ("Game of Life: Tumblers", "Created by John Conway")
+        }
+        AnimationStyle::GameOfLife(_) => unreachable!("resolved Game of Life variant"),
+        AnimationStyle::FriendsAndEnemies => {
+            ("Friends and Enemies", "Particle rule by Simon Woods")
+        }
+        AnimationStyle::Primordial => (
+            "Primordial",
+            "Model by Thomas Schmickl, Martin Stefanec and Karl Crailsheim",
+        ),
+        AnimationStyle::Physarum => ("Physarum", "Based on the model by Jeff Jones"),
+        AnimationStyle::Chladni => ("Chladni", "Equations documented by Paul Bourke"),
+        AnimationStyle::Mandelbrot => ("Mandelbrot", "Fractal research by Benoît Mandelbrot"),
+        AnimationStyle::Matrix => ("Matrix", "Original rain design by Simon Whiteley"),
+    }
+}
+
+fn card_timing(elapsed: Duration, lifetime: Duration) -> (f64, Duration) {
+    if elapsed >= lifetime {
+        return (0.0, Duration::MAX);
+    }
+    let edge =
+        (elapsed.min(lifetime - elapsed).as_secs_f64() * 4.0 / lifetime.as_secs_f64()).min(1.0);
+    // During the hold, only the simulation needs redraws. Wake at the fade-out
+    // boundary so slow animations do not postpone the card's next transition.
+    let delay = if edge < 1.0 {
+        CARD_FRAME_DELAY.min(lifetime - elapsed)
+    } else {
+        lifetime * 3 / 4 - elapsed
+    };
+    (edge * edge * (3.0 - 2.0 * edge), delay)
+}
+
+fn identity_card(style: AnimationStyle, width: usize, height: usize, intensity: f64) -> String {
+    // Leave two columns on each side, plus the border and inner padding.
+    let available = width.saturating_sub(8).min(52);
+    if intensity <= 0.0 || available == 0 {
+        return String::new();
+    }
+    let (title, credit) = animation_credit(style);
+    let mut lines = Vec::new();
+    for (text, color) in [
+        (title, [235, 241, 250]),
+        (credit, [176, 190, 210]),
+        (BROWSE_HINT, [94, 183, 194]),
+    ] {
+        let mut line = String::new();
+        for word in text.split_whitespace() {
+            if word.chars().count() > available {
+                return String::new(); // Never cut a creator's name in half.
+            }
+            if !line.is_empty() && line.chars().count() + 1 + word.chars().count() > available {
+                lines.push((line, color));
+                line = String::new();
+            }
+            if !line.is_empty() {
+                line.push(' ');
+            }
+            line.push_str(word);
+        }
+        lines.push((line, color));
+    }
+    if lines.len() + 4 > height {
+        return String::new();
+    }
+    let inner = lines
+        .iter()
+        .map(|(line, _)| line.chars().count())
+        .max()
+        .unwrap();
+    let border = [64, 88, 112];
+    let mut rows = vec![(format!("╭{}╮", "─".repeat(inner + 2)), border)];
+    rows.extend(
+        lines
+            .into_iter()
+            .map(|(line, color)| (format!("│ {line:<inner$} │"), color)),
+    );
+    rows.push((format!("╰{}╯", "─".repeat(inner + 2)), border));
+    let mut output = String::new();
+    // Terminal cells have no alpha channel. Fade text/border RGB against a dark
+    // backing, which keeps the held card legible on light and animated backgrounds.
+    for (row, (line, color)) in rows.into_iter().enumerate() {
+        let [r, g, b] = color.map(|channel| (channel as f64 * intensity).round() as u8);
+        write!(
+            output,
+            "\x1b[{};3H\x1b[0m\x1b[48;2;0;0;0m\x1b[38;2;{r};{g};{b}m{line}\x1b[0m",
+            row + 2
+        )
+        .expect("writing to a String");
+    }
+    output
 }
 
 fn wait_for_duration(duration: Duration) -> Result<(), String> {
@@ -685,6 +826,58 @@ mod tests {
 
     // Test lane: default
 
+    #[test]
+    fn identity_card_fades_wraps_and_preserves_complete_credits() {
+        for lifetime in [
+            Duration::from_secs(4),
+            Duration::from_secs(1),
+            Duration::ZERO,
+        ] {
+            assert_eq!(card_timing(Duration::ZERO, lifetime).0, 0.0);
+            assert_eq!(card_timing(lifetime, lifetime), (0.0, Duration::MAX));
+            assert_eq!(
+                card_timing(lifetime + Duration::from_secs(1), lifetime),
+                (0.0, Duration::MAX)
+            );
+            if !lifetime.is_zero() {
+                assert_eq!(card_timing(lifetime / 4, lifetime), (1.0, lifetime / 2));
+                assert_eq!(card_timing(lifetime / 2, lifetime), (1.0, lifetime / 4));
+                assert_eq!(card_timing(lifetime / 8, lifetime), (0.5, CARD_FRAME_DELAY));
+                assert_eq!(
+                    card_timing(lifetime * 7 / 8, lifetime),
+                    (0.5, CARD_FRAME_DELAY)
+                );
+                let just_before_fade = lifetime * 3 / 4 - Duration::from_millis(1);
+                assert_eq!(
+                    card_timing(just_before_fade, lifetime),
+                    (1.0, Duration::from_millis(1))
+                );
+            }
+        }
+        assert_eq!(strip_ansi("\x1b[2;3HH\x1b[0m\x1b[3;3HHello"), "\nH\nHello");
+        for &style in ANIMATION_STYLES {
+            let (title, credit) = animation_credit(style);
+            for width in [24, 40, 80, 160] {
+                let card = identity_card(style, width, 24, 1.0);
+                let plain = strip_ansi(&card);
+                let lines: Vec<_> = plain.lines().skip(1).collect();
+                assert!(!lines.is_empty());
+                assert!(lines.iter().all(|line| line.chars().count() <= width - 4));
+                let text = lines.join(" ").replace(['│', '╭', '╮', '╰', '╯', '─'], " ");
+                let text = text.split_whitespace().collect::<Vec<_>>().join(" ");
+                assert_eq!(text, format!("{title} {credit} {BROWSE_HINT}"));
+            }
+            for (width, height) in [(0, 0), (1, 1), (8, 24), (80, 3)] {
+                assert!(identity_card(style, width, height, 1.0).is_empty());
+            }
+            assert!(identity_card(style, 80, 24, 0.0).is_empty());
+            let dim = identity_card(style, 80, 24, 0.5);
+            let bright = identity_card(style, 80, 24, 1.0);
+            assert_ne!(dim, bright);
+            assert_eq!(strip_ansi(&dim), strip_ansi(&bright));
+        }
+    }
+
     // Defends: every advertised style is executable.
     #[test]
     fn supported_styles_resolve() {
@@ -848,6 +1041,9 @@ mod tests {
             if ch == '\x1b' && chars.peek() == Some(&'[') {
                 chars.next();
                 for inner in chars.by_ref() {
+                    if inner == 'H' {
+                        out.push('\n');
+                    }
                     if inner.is_ascii_alphabetic() {
                         break;
                     }

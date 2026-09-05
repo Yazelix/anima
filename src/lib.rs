@@ -290,7 +290,7 @@ pub fn flush_stdout() -> io::Result<()> {
 pub fn render_screen_frame(frame: &[String]) -> io::Result<()> {
     let stdout = io::stdout();
     let mut stdout = stdout.lock();
-    terminal_control::render_screen_frame(&mut stdout, frame)
+    terminal_control::render_screen_frame(&mut stdout, frame, "")
 }
 
 pub fn enter_screen_mode() -> io::Result<()> {
@@ -332,7 +332,7 @@ mod tests {
         let frame = vec!["a".repeat(4_096), "b".repeat(4_096), "c".to_string()];
         let mut output = Vec::new();
 
-        terminal_control::render_screen_frame(&mut output, &frame).unwrap();
+        terminal_control::render_screen_frame(&mut output, &frame, "").unwrap();
 
         let output = String::from_utf8(output).unwrap();
         assert!(output.len() > 8 * 1_024);
@@ -345,6 +345,15 @@ mod tests {
         assert!(!output.contains('\n'));
         assert!(output.contains(&frame[0]));
         assert!(output.contains(&frame[1]));
+
+        let overlay = "\x1b[2;3Hname and credit\x1b[0m";
+        let mut composed = Vec::new();
+        terminal_control::render_screen_frame(&mut composed, &frame, overlay).unwrap();
+        let composed = String::from_utf8(composed).unwrap();
+        assert_eq!(composed.matches(BEGIN).count(), 1);
+        assert_eq!(composed.matches(END).count(), 1);
+        assert!(composed.ends_with(&format!("{overlay}{END}")));
+        assert!(composed.find(&frame[1]).unwrap() < composed.find(overlay).unwrap());
     }
 
     #[test]

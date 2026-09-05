@@ -38,14 +38,14 @@ nix run github:Yazelix/anima#yzs -- random --duration-seconds 3
 Special thanks to:
 
 - [Craig Reynolds](https://www.red3d.com/cwr/), who created
-  [Boids](https://www.red3d.com/cwr/boids/) in 1986. Its separation, alignment,
-  and cohesion rules inspire Anima's Boids animations.
+  [Boids](https://www.red3d.com/cwr/boids/) in 1986. Anima implements its
+  separation, alignment, and cohesion rules in its flocking animations.
 - [John Horton Conway](https://mathshistory.st-andrews.ac.uk/Biographies/Conway/),
-  who invented the Game of Life in 1970. His cellular automaton inspires
-  Anima's Game of Life animations.
+  who invented the Game of Life in 1970. Anima runs his cellular automaton
+  with glider and tumbler seeds.
 - [Simon Woods](https://community.wolfram.com/groups/-/m/t/122095), who
-  published the friends-and-enemies particle dance. Its update rule inspires
-  Anima's dense particle animation.
+  published the friends-and-enemies particle dance. Anima implements its
+  update rule in its dense particle animation.
 - [Benoît Mandelbrot](https://news.yale.edu/2010/10/18/memoriam-benoit-mandelbrot),
   whose pioneering fractal work led to the Mandelbrot set. It inspires Anima's
   Mandelbrot animation.
@@ -53,8 +53,8 @@ Special thanks to:
   who designed the digital rain for *The Matrix*. It inspires Anima's Matrix
   animation.
 - [Thomas Schmickl, Martin Stefanec, and Karl Crailsheim](https://www.nature.com/articles/srep37969),
-  who introduced the Primordial Particle System motion law. It inspires Anima's
-  Primordial animation.
+  who introduced the Primordial Particle System motion law. Anima implements
+  that law in its Primordial animation.
 - [Jeff Jones](https://doi.org/10.1162/artl.2010.16.2.16202), whose particle model
   of Physarum transport networks inspires Anima's trail-network animation.
 - [Paul Bourke](https://www.paulbourke.net/geometry/chladni/), who documents the
@@ -126,6 +126,16 @@ an animation. No style means `random`
 
 In native animations, `Left`/`h`/`p` selects the previous style and
 `Right`/`l`/`n` selects the next; any other key exits
+
+A top-left card shows the animation name, the original creator's role and
+credit, and `←/h previous · l/→ next` on startup and after switching styles.
+Its text and border fade in for one second, hold for two, then fade out for
+one. Short timed sessions scale that sequence to the remaining time;
+switching does not extend the session. The RGB fade uses an opaque black
+backing for contrast. Credits wrap in narrow terminals; the card stays hidden
+if the complete text cannot fit. Static, logo, and the separate aquarium
+process do not use this card. Library frame producers return animation-only
+frames
 
 Random chooses from the dogfooded animated styles. `static`, `logo`, and
 `friends_and_enemies` remain explicitly selectable but outside that pool.

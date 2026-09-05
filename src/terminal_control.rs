@@ -94,8 +94,13 @@ pub(crate) fn screen_frame_output(frame: &[String]) -> String {
     })
 }
 
-pub(crate) fn render_screen_frame(writer: &mut impl Write, frame: &[String]) -> io::Result<()> {
-    let output = screen_frame_output(frame);
+pub(crate) fn render_screen_frame(
+    writer: &mut impl Write,
+    frame: &[String],
+    overlay: &str,
+) -> io::Result<()> {
+    let mut output = screen_frame_output(frame);
+    output.push_str(overlay);
     writer.sync_update(|writer| writer.write_all(output.as_bytes()))?
 }
 
