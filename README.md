@@ -147,10 +147,11 @@ if the complete text cannot fit. Static, logo, and the separate aquarium
 process do not use this card. Library frame producers return animation-only
 frames
 
-Random chooses from the dogfooded animated styles. `static`, `logo`, and
-`friends_and_enemies` remain explicitly selectable but outside that pool.
-`physarum`, `chladni`, and `plasma` are available by name and through native browsing;
-they stay outside random selection pending integrated Nova dogfooding
+Random chooses from all current native animations and Aquarium, including
+`friends_and_enemies`, `physarum`, `chladni`, and `plasma`. `static` and `logo`
+remain explicitly selectable but outside that pool. The library random helper
+includes all native animation families with equal family weighting; it does
+not launch the external Aquarium process
 
 In `physarum`, agents follow and deposit trails that diffuse into branching
 networks. The animation uses truecolor half blocks, a 6,000-agent ceiling, and

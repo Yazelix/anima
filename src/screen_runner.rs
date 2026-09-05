@@ -41,7 +41,11 @@ pub const SCREEN_RANDOM_STYLES: &[&str] = &[
     "boids",
     "boids_predator",
     "boids_schools",
+    FRIENDS_AND_ENEMIES_STYLE,
     PRIMORDIAL_STYLE,
+    PHYSARUM_STYLE,
+    CHLADNI_STYLE,
+    PLASMA_STYLE,
     MANDELBROT_STYLE,
     MATRIX_STYLE,
     "game_of_life_gliders",
@@ -962,20 +966,35 @@ mod tests {
         );
     }
 
-    // Defends: random welcome uses only dogfooded styles while exclusions remain selectable.
+    // Defends: every current animation resolves from random; static/logo never do.
     #[test]
-    fn random_pool_keeps_excluded_styles_explicit() {
-        for style in [
-            STATIC_STYLE,
-            LOGO_STYLE,
-            FRIENDS_AND_ENEMIES_STYLE,
-            PHYSARUM_STYLE,
-            CHLADNI_STYLE,
-            PLASMA_STYLE,
-        ] {
-            assert!(!SCREEN_RANDOM_STYLES.contains(&style));
-            assert!(!crate::random_animation_styles().contains(&style));
-            assert!(resolve_style(style, None, "anima").is_ok());
+    fn random_pool_resolves_current_animations_with_existing_alias_weight() {
+        let mut native = Vec::new();
+        let mut aquariums = 0;
+        for index in 0..SCREEN_RANDOM_STYLES.len() {
+            match resolve_style("random", Some(index), "anima").unwrap() {
+                ScreenStyle::Animation(style) => native.push(style),
+                ScreenStyle::Asciiquarium => aquariums += 1,
+                _ => panic!("random selected a non-animation"),
+            }
+        }
+        assert_eq!(aquariums, 1);
+        assert_eq!(native.len(), ANIMATION_STYLES.len() + 1);
+        for style in ANIMATION_STYLES {
+            // `boids` remains an additional alias slot for the predator variant.
+            let weight = if *style == AnimationStyle::Boids(BoidsVariant::Predator) {
+                2
+            } else {
+                1
+            };
+            assert_eq!(
+                native
+                    .iter()
+                    .filter(|candidate| *candidate == style)
+                    .count(),
+                weight,
+                "{style:?}"
+            );
         }
     }
 

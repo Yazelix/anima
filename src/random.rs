@@ -9,6 +9,10 @@ const RANDOM_ANIMATION_FAMILIES: &[&[&str]] = &[
     &[MANDELBROT_STYLE],
     &[crate::matrix::MATRIX_STYLE],
     &[crate::primordial::PRIMORDIAL_STYLE],
+    &[crate::friends_and_enemies::FRIENDS_AND_ENEMIES_STYLE],
+    &[crate::physarum::PHYSARUM_STYLE],
+    &[crate::chladni::CHLADNI_STYLE],
+    &[crate::plasma::PLASMA_STYLE],
 ];
 
 pub fn random_animation_slot_count() -> usize {
@@ -86,31 +90,34 @@ mod tests {
 
     // Test lane: default
 
-    // Defends: random animation only rotates across the supported text animation families.
+    // Defends: all current native families are reachable with equal family weight.
     #[test]
-    fn random_animation_style_rotates_across_default_text_families() {
-        let mut game_of_life_count = 0;
-        let mut boids_count = 0;
-        let mut mandelbrot_count = 0;
-        let mut matrix_count = 0;
-        let mut primordial_count = 0;
-
+    fn random_animation_style_balances_native_families() {
+        use std::collections::BTreeMap;
+        let mut counts = BTreeMap::new();
         for index in 0..random_animation_slot_count() {
-            match resolve_random_animation_style(Some(index)) {
-                style if GAME_OF_LIFE_RANDOM_STYLES.contains(&style) => game_of_life_count += 1,
-                style if BOIDS_RANDOM_STYLES.contains(&style) => boids_count += 1,
-                MANDELBROT_STYLE => mandelbrot_count += 1,
-                crate::matrix::MATRIX_STYLE => matrix_count += 1,
-                crate::primordial::PRIMORDIAL_STYLE => primordial_count += 1,
-                other => panic!("unexpected random style {other}"),
-            }
+            *counts
+                .entry(resolve_random_animation_style(Some(index)))
+                .or_insert(0) += 1;
         }
-
-        let expected = random_animation_subpool_width();
-        assert_eq!(game_of_life_count, expected);
-        assert_eq!(boids_count, expected);
-        assert_eq!(mandelbrot_count, expected);
-        assert_eq!(matrix_count, expected);
-        assert_eq!(primordial_count, expected);
+        assert_eq!(
+            counts,
+            BTreeMap::from([
+                ("game_of_life_gliders", 1),
+                ("game_of_life_tumblers", 1),
+                ("boids_predator", 1),
+                ("boids_schools", 1),
+                (MANDELBROT_STYLE, 2),
+                (crate::matrix::MATRIX_STYLE, 2),
+                (crate::primordial::PRIMORDIAL_STYLE, 2),
+                (crate::friends_and_enemies::FRIENDS_AND_ENEMIES_STYLE, 2),
+                (crate::physarum::PHYSARUM_STYLE, 2),
+                (crate::chladni::CHLADNI_STYLE, 2),
+                (crate::plasma::PLASMA_STYLE, 2),
+            ])
+        );
+        let mut advertised = random_animation_styles();
+        advertised.sort_unstable();
+        assert_eq!(advertised, counts.keys().copied().collect::<Vec<_>>());
     }
 }
