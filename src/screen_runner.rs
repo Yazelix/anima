@@ -2,11 +2,11 @@ use crate::random::system_random_index;
 use crate::{
     BoidsAnimation, BoidsVariant, FRIENDS_AND_ENEMIES_STYLE, FriendsAndEnemiesAnimation,
     GAME_OF_LIFE_RANDOM_STYLES, GameOfLifeAnimation, GameOfLifeCellStyle, MANDELBROT_STYLE,
-    MATRIX_STYLE, MandelbrotAnimation, MatrixAnimation, PRIMORDIAL_STYLE, PrimordialAnimation,
-    RawModeGuard, ScreenAnimationContext, ScreenFrameProducer, center_frame_lines, center_text,
-    enter_screen_mode, game_of_life_spec, leave_screen_mode, mandelbrot_frame_delay,
-    matrix_frame_delay, primordial_frame_delay, render_screen_frame, terminal_height,
-    terminal_width,
+    MATRIX_STYLE, MandelbrotAnimation, MatrixAnimation, PHYSARUM_STYLE, PRIMORDIAL_STYLE,
+    PhysarumAnimation, PrimordialAnimation, RawModeGuard, ScreenAnimationContext,
+    ScreenFrameProducer, center_frame_lines, center_text, enter_screen_mode, game_of_life_spec,
+    leave_screen_mode, mandelbrot_frame_delay, matrix_frame_delay, physarum_frame_delay,
+    primordial_frame_delay, render_screen_frame, terminal_height, terminal_width,
 };
 use crossterm::event::{self, KeyCode, KeyEvent, KeyEventKind};
 use std::io::{self, Write};
@@ -25,6 +25,7 @@ pub const SCREEN_STYLES: &[&str] = &[
     "boids_schools",
     FRIENDS_AND_ENEMIES_STYLE,
     PRIMORDIAL_STYLE,
+    PHYSARUM_STYLE,
     MANDELBROT_STYLE,
     MATRIX_STYLE,
     "game_of_life_gliders",
@@ -55,6 +56,7 @@ enum AnimationStyle {
     GameOfLife(&'static str),
     FriendsAndEnemies,
     Primordial,
+    Physarum,
     Mandelbrot,
     Matrix,
 }
@@ -64,6 +66,7 @@ const ANIMATION_STYLES: &[AnimationStyle] = &[
     AnimationStyle::Boids(BoidsVariant::Schools),
     AnimationStyle::FriendsAndEnemies,
     AnimationStyle::Primordial,
+    AnimationStyle::Physarum,
     AnimationStyle::Mandelbrot,
     AnimationStyle::Matrix,
     AnimationStyle::GameOfLife(GAME_OF_LIFE_RANDOM_STYLES[0]),
@@ -223,6 +226,9 @@ fn resolve_style(
     }
     if normalized == PRIMORDIAL_STYLE {
         return Ok(ScreenStyle::Animation(AnimationStyle::Primordial));
+    }
+    if normalized == PHYSARUM_STYLE {
+        return Ok(ScreenStyle::Animation(AnimationStyle::Physarum));
     }
     if normalized == MATRIX_STYLE {
         return Ok(ScreenStyle::Animation(AnimationStyle::Matrix));
@@ -384,6 +390,7 @@ fn build_animation(
         }
         AnimationStyle::FriendsAndEnemies => Box::new(FriendsAndEnemiesAnimation::new(context)),
         AnimationStyle::Primordial => Box::new(PrimordialAnimation::new(context)),
+        AnimationStyle::Physarum => Box::new(PhysarumAnimation::new(context)),
         AnimationStyle::Mandelbrot => Box::new(MandelbrotAnimation::new(context)),
         AnimationStyle::Matrix => Box::new(MatrixAnimation::new(context)),
     }
@@ -395,6 +402,7 @@ fn context_for_style(style: AnimationStyle, width: usize, height: usize) -> Scre
         AnimationStyle::Boids(_)
         | AnimationStyle::FriendsAndEnemies
         | AnimationStyle::Primordial
+        | AnimationStyle::Physarum
         | AnimationStyle::Mandelbrot
         | AnimationStyle::Matrix => full_screen_context(width, height),
     }
@@ -425,6 +433,7 @@ fn frame_delay(style: AnimationStyle) -> Duration {
         AnimationStyle::Boids(_) => Duration::from_millis(70),
         AnimationStyle::FriendsAndEnemies => Duration::from_millis(55),
         AnimationStyle::Primordial => primordial_frame_delay(),
+        AnimationStyle::Physarum => physarum_frame_delay(),
         AnimationStyle::Mandelbrot => mandelbrot_frame_delay(),
         AnimationStyle::Matrix => matrix_frame_delay(),
         AnimationStyle::GameOfLife(_) => Duration::from_millis(160),
@@ -672,6 +681,20 @@ mod tests {
         for style in SCREEN_STYLES {
             assert!(resolve_style(style, None, "yzs").is_ok());
         }
+        assert!(matches!(
+            resolve_style(" PHYSARUM ", None, "yzs"),
+            Ok(ScreenStyle::Animation(AnimationStyle::Physarum))
+        ));
+        assert_eq!(
+            build_animation(
+                AnimationStyle::Physarum,
+                40,
+                12,
+                GameOfLifeCellStyle::FullBlock
+            )
+            .render_frame(),
+            PhysarumAnimation::new(full_screen_context(40, 12)).render_frame()
+        );
         for style in ["game_of_life_oscillators", "game_of_life_bloom"] {
             assert!(resolve_style(style, None, "yzs").is_err());
         }
@@ -680,8 +703,14 @@ mod tests {
     // Defends: random welcome uses only dogfooded styles while exclusions remain selectable.
     #[test]
     fn random_pool_keeps_excluded_styles_explicit() {
-        for style in [STATIC_STYLE, LOGO_STYLE, FRIENDS_AND_ENEMIES_STYLE] {
+        for style in [
+            STATIC_STYLE,
+            LOGO_STYLE,
+            FRIENDS_AND_ENEMIES_STYLE,
+            PHYSARUM_STYLE,
+        ] {
             assert!(!SCREEN_RANDOM_STYLES.contains(&style));
+            assert!(!crate::random_animation_styles().contains(&style));
             assert!(resolve_style(style, None, "yzs").is_ok());
         }
     }
@@ -718,6 +747,7 @@ mod tests {
                 AnimationStyle::Boids(BoidsVariant::Schools),
                 AnimationStyle::FriendsAndEnemies,
                 AnimationStyle::Primordial,
+                AnimationStyle::Physarum,
                 AnimationStyle::Mandelbrot,
                 AnimationStyle::Matrix,
                 AnimationStyle::GameOfLife(GAME_OF_LIFE_RANDOM_STYLES[0]),

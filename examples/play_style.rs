@@ -3,10 +3,11 @@ use std::{io, thread, time::Duration};
 use yazelix_screen::{
     BoidsAnimation, BoidsVariant, FRIENDS_AND_ENEMIES_STYLE, FriendsAndEnemiesAnimation,
     GAME_OF_LIFE_RANDOM_STYLES, GameOfLifeAnimation, GameOfLifeCellStyle, MANDELBROT_STYLE,
-    MATRIX_STYLE, MandelbrotAnimation, MatrixAnimation, PRIMORDIAL_STYLE, PrimordialAnimation,
-    ScreenAnimationContext, ScreenFrameProducer, enter_screen_mode, game_of_life_spec,
-    leave_screen_mode, mandelbrot_frame_delay, matrix_frame_delay, primordial_frame_delay,
-    render_screen_frame, terminal_height, terminal_width,
+    MATRIX_STYLE, MandelbrotAnimation, MatrixAnimation, PHYSARUM_STYLE, PRIMORDIAL_STYLE,
+    PhysarumAnimation, PrimordialAnimation, ScreenAnimationContext, ScreenFrameProducer,
+    enter_screen_mode, game_of_life_spec, leave_screen_mode, mandelbrot_frame_delay,
+    matrix_frame_delay, physarum_frame_delay, primordial_frame_delay, render_screen_frame,
+    terminal_height, terminal_width,
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -17,6 +18,7 @@ enum ExampleStyle {
     Mandelbrot,
     Matrix,
     Primordial,
+    Physarum,
 }
 
 struct ScreenModeGuard;
@@ -73,6 +75,9 @@ fn resolve_style(raw: &str) -> Result<ExampleStyle, io::Error> {
     if normalized == PRIMORDIAL_STYLE {
         return Ok(ExampleStyle::Primordial);
     }
+    if normalized == PHYSARUM_STYLE {
+        return Ok(ExampleStyle::Physarum);
+    }
     if let Some(style) = GAME_OF_LIFE_RANDOM_STYLES
         .iter()
         .find(|candidate| **candidate == normalized)
@@ -84,7 +89,7 @@ fn resolve_style(raw: &str) -> Result<ExampleStyle, io::Error> {
     Err(io::Error::new(
         io::ErrorKind::InvalidInput,
         format!(
-            "unsupported style `{normalized}`; expected boids, boids_predator, boids_schools, friends_and_enemies, primordial, mandelbrot, matrix, game_of_life_gliders, or game_of_life_tumblers"
+            "unsupported style `{normalized}`; expected boids, boids_predator, boids_schools, friends_and_enemies, primordial, physarum, mandelbrot, matrix, game_of_life_gliders, or game_of_life_tumblers"
         ),
     ))
 }
@@ -106,6 +111,7 @@ fn build_animation(style: ExampleStyle) -> Box<dyn ScreenFrameProducer> {
         ExampleStyle::Mandelbrot => Box::new(MandelbrotAnimation::new(context)),
         ExampleStyle::Matrix => Box::new(MatrixAnimation::new(context)),
         ExampleStyle::Primordial => Box::new(PrimordialAnimation::new(context)),
+        ExampleStyle::Physarum => Box::new(PhysarumAnimation::new(context)),
     }
 }
 
@@ -119,6 +125,7 @@ fn context_for_style(style: ExampleStyle, width: usize, height: usize) -> Screen
         ExampleStyle::Boids(_)
         | ExampleStyle::FriendsAndEnemies
         | ExampleStyle::Primordial
+        | ExampleStyle::Physarum
         | ExampleStyle::Mandelbrot
         | ExampleStyle::Matrix => width,
     };
@@ -150,6 +157,7 @@ fn frame_delay(style: ExampleStyle) -> Duration {
         ExampleStyle::Mandelbrot => mandelbrot_frame_delay(),
         ExampleStyle::Matrix => matrix_frame_delay(),
         ExampleStyle::Primordial => primordial_frame_delay(),
+        ExampleStyle::Physarum => physarum_frame_delay(),
         ExampleStyle::GameOfLife(_) => Duration::from_millis(160),
     }
 }

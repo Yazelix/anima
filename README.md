@@ -14,13 +14,14 @@ nix run github:Yazelix/anima#yzs -- asciiquarium --duration-seconds 3
 nix run github:Yazelix/anima#yzs -- mandelbrot
 nix run github:Yazelix/anima#yzs -- friends_and_enemies
 nix run github:Yazelix/anima#yzs -- primordial
+nix run github:Yazelix/anima#yzs -- physarum
 nix run github:Yazelix/anima#yzs -- game_of_life_tumblers --cell-style dotted
 nix run github:Yazelix/anima#yzs -- random --duration-seconds 3
 ```
 
 ## What It Contains
 
-- Animation engines for Boids, friends and enemies, Primordial Particle Systems, Mandelbrot, Matrix rain, and Game of Life
+- Animation engines for Boids, friends and enemies, Primordial Particle Systems, Physarum trail networks, Mandelbrot, Matrix rain, and Game of Life
 - The separately packaged `asciiquarium-rs` terminal aquarium
 - Static and logo-style Yazelix welcome screens
 - File-backed Kitty PNG frame sequence rendering
@@ -51,6 +52,8 @@ Special thanks to:
 - [Thomas Schmickl, Martin Stefanec, and Karl Crailsheim](https://www.nature.com/articles/srep37969),
   who introduced the Primordial Particle System motion law. It inspires Anima's
   Primordial animation.
+- [Jeff Jones](https://doi.org/10.1162/artl.2010.16.2.16202), whose particle model
+  of Physarum transport networks inspires Anima's trail-network animation.
 
 ## User Command
 
@@ -63,6 +66,7 @@ yzs static
 yzs asciiquarium --duration-seconds 3
 yzs friends_and_enemies --duration-seconds 3
 yzs primordial --duration-seconds 3
+yzs physarum --duration-seconds 3
 yzs mandelbrot
 yzs game_of_life_tumblers --cell-style dotted
 yzs random --duration-seconds 3
@@ -85,6 +89,7 @@ cargo run --bin yzs -- static
 cargo run --bin yzs -- asciiquarium --duration-seconds 3
 cargo run --bin yzs -- friends_and_enemies --duration-seconds 3
 cargo run --bin yzs -- primordial --duration-seconds 3
+cargo run --bin yzs -- physarum --duration-seconds 3
 cargo run --bin yzs -- mandelbrot
 cargo run --bin yzs -- game_of_life_tumblers --cell-style dotted
 cargo run --bin yzs -- random --duration-seconds 3
@@ -102,6 +107,7 @@ nix run .#yzs -- static
 nix run .#yzs -- asciiquarium --duration-seconds 3
 nix run .#yzs -- friends_and_enemies --duration-seconds 3
 nix run .#yzs -- primordial --duration-seconds 3
+nix run .#yzs -- physarum --duration-seconds 3
 nix run .#yzs -- mandelbrot
 nix run .#yzs -- random --duration-seconds 3
 ```
@@ -116,6 +122,7 @@ Supported styles:
 - `boids_schools`
 - `friends_and_enemies`
 - `primordial`
+- `physarum`
 - `mandelbrot`
 - `matrix`
 - `game_of_life_gliders`
@@ -128,7 +135,14 @@ In native animations, `Left`/`h`/`p` selects the previous style and
 `Right`/`l`/`n` selects the next; any other key exits
 
 Random chooses from the dogfooded animated styles. `static`, `logo`, and
-`friends_and_enemies` remain explicitly selectable but outside that pool
+`friends_and_enemies` remain explicitly selectable but outside that pool.
+`physarum` is available by name and through native browsing; it stays outside
+random selection pending integrated Nova dogfooding
+
+In `physarum`, agents follow and deposit trails that diffuse into branching
+networks. The animation uses truecolor half blocks, a 6,000-agent ceiling, and
+the shared duration, input, and resize handling. It adds no dependency. This is
+a visual approximation of Jones's model, without biological-fidelity claims
 
 The aquarium runs as a separate
 [`asciiquarium-rs`](https://github.com/cablehead/asciiquarium-rs) process under
@@ -157,6 +171,7 @@ cargo run --example play_style -- matrix 90
 cargo run --example play_style -- boids_schools 120
 cargo run --example play_style -- friends_and_enemies 90
 cargo run --example play_style -- primordial 180
+cargo run --example play_style -- physarum 180
 cargo run --example play_style -- game_of_life_gliders 80
 ```
 
