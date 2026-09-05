@@ -8,6 +8,7 @@ mod kitty_frames;
 mod mandelbrot;
 mod matrix;
 mod physarum;
+mod plasma;
 mod primordial;
 mod random;
 mod scalar_field;
@@ -40,6 +41,7 @@ pub use mandelbrot::{
 };
 pub use matrix::{MATRIX_STYLE, MatrixAnimation, matrix_frame_delay};
 pub use physarum::{PHYSARUM_STYLE, PhysarumAnimation, physarum_frame_delay};
+pub use plasma::{PLASMA_STYLE, PlasmaAnimation, plasma_frame_delay};
 pub use primordial::{PRIMORDIAL_STYLE, PrimordialAnimation, primordial_frame_delay};
 pub use random::{
     BOIDS_RANDOM_STYLES, GAME_OF_LIFE_RANDOM_STYLES, MANDELBROT_STYLE, random_animation_slot_count,

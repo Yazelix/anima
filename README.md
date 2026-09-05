@@ -18,13 +18,14 @@ nix run github:Yazelix/anima#yzs -- friends_and_enemies
 nix run github:Yazelix/anima#yzs -- primordial
 nix run github:Yazelix/anima#yzs -- physarum
 nix run github:Yazelix/anima#yzs -- chladni
+nix run github:Yazelix/anima#yzs -- plasma
 nix run github:Yazelix/anima#yzs -- game_of_life_tumblers --cell-style dotted
 nix run github:Yazelix/anima#yzs -- random --duration-seconds 3
 ```
 
 ## What It Contains
 
-- Animation engines for Boids, friends and enemies, Primordial Particle Systems, Physarum trail networks, Chladni nodal patterns, Mandelbrot, Matrix rain, and Game of Life
+- Animation engines for Boids, friends and enemies, Primordial Particle Systems, Physarum trail networks, Chladni nodal patterns, Plasma interference, Mandelbrot, Matrix rain, and Game of Life
 - The separately packaged `asciiquarium-rs` terminal aquarium
 - Static and logo-style Yazelix welcome screens
 - File-backed Kitty PNG frame sequence rendering
@@ -59,6 +60,9 @@ Special thanks to:
   of Physarum transport networks inspires Anima's trail-network animation.
 - [Paul Bourke](https://www.paulbourke.net/geometry/chladni/), who documents the
   Chladni nodal equations used in Anima's geometric animation.
+- [Lode Vandevenne](https://lodev.org/cgtutor/plasma.html), who documents
+  sine-sum plasma and circular palettes. Anima uses that technique with its
+  own wave frequencies, motion, and colors.
 
 ## User Command
 
@@ -73,6 +77,7 @@ yzs friends_and_enemies --duration-seconds 3
 yzs primordial --duration-seconds 3
 yzs physarum --duration-seconds 3
 yzs chladni --duration-seconds 3
+yzs plasma --duration-seconds 3
 yzs mandelbrot
 yzs game_of_life_tumblers --cell-style dotted
 yzs random --duration-seconds 3
@@ -97,6 +102,7 @@ cargo run --bin yzs -- friends_and_enemies --duration-seconds 3
 cargo run --bin yzs -- primordial --duration-seconds 3
 cargo run --bin yzs -- physarum --duration-seconds 3
 cargo run --bin yzs -- chladni --duration-seconds 3
+cargo run --bin yzs -- plasma --duration-seconds 3
 cargo run --bin yzs -- mandelbrot
 cargo run --bin yzs -- game_of_life_tumblers --cell-style dotted
 cargo run --bin yzs -- random --duration-seconds 3
@@ -116,6 +122,7 @@ nix run .#yzs -- friends_and_enemies --duration-seconds 3
 nix run .#yzs -- primordial --duration-seconds 3
 nix run .#yzs -- physarum --duration-seconds 3
 nix run .#yzs -- chladni --duration-seconds 3
+nix run .#yzs -- plasma --duration-seconds 3
 nix run .#yzs -- mandelbrot
 nix run .#yzs -- random --duration-seconds 3
 ```
@@ -139,7 +146,7 @@ frames
 
 Random chooses from the dogfooded animated styles. `static`, `logo`, and
 `friends_and_enemies` remain explicitly selectable but outside that pool.
-`physarum` and `chladni` are available by name and through native browsing;
+`physarum`, `chladni`, and `plasma` are available by name and through native browsing;
 they stay outside random selection pending integrated Nova dogfooding
 
 In `physarum`, agents follow and deposit trails that diffuse into branching
@@ -153,6 +160,13 @@ Warm nodal lines separate blue and violet regions on an opaque background.
 The animation uses square half-block samples under the 2:1 terminal-cell
 convention, cached cosine terms, and a fixed palette of at most 64 colors.
 It is a visual approximation of plate patterns, not an acoustic simulation
+
+In `plasma`, horizontal, vertical, diagonal, and radial sine waves form moving
+color bands. A circular 64-color palette shifts through the field without a
+hard color seam. The animation uses square half-block samples under the 2:1
+terminal-cell convention and a 1,200-frame loop (48 seconds of frame delays,
+plus rendering and terminal I/O time). Spatial phases are cached on resize;
+frame updates use a fixed amount of work per pixel and add no dependency
 
 The aquarium runs as a separate
 [`asciiquarium-rs`](https://github.com/cablehead/asciiquarium-rs) process under
@@ -218,6 +232,12 @@ Run the command above a GIF to watch that style in your terminal.
 
 ![Warm nodal lines shifting between blue and violet standing-wave patterns](assets/animations/chladni.gif)
 
+### Plasma
+
+`yzs plasma`
+
+![Flowing colored bands formed by overlapping sine waves](assets/animations/plasma.gif)
+
 ### Mandelbrot
 
 `yzs mandelbrot`
@@ -260,6 +280,7 @@ cargo run --example play_style -- friends_and_enemies 90
 cargo run --example play_style -- primordial 180
 cargo run --example play_style -- physarum 180
 cargo run --example play_style -- chladni 180
+cargo run --example play_style -- plasma 180
 cargo run --example play_style -- game_of_life_gliders 80
 ```
 

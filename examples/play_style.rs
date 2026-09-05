@@ -4,11 +4,11 @@ use yazelix_screen::{
     BoidsAnimation, BoidsVariant, CHLADNI_STYLE, ChladniAnimation, FRIENDS_AND_ENEMIES_STYLE,
     FriendsAndEnemiesAnimation, GAME_OF_LIFE_RANDOM_STYLES, GameOfLifeAnimation,
     GameOfLifeCellStyle, MANDELBROT_STYLE, MATRIX_STYLE, MandelbrotAnimation, MatrixAnimation,
-    PHYSARUM_STYLE, PRIMORDIAL_STYLE, PhysarumAnimation, PrimordialAnimation,
-    ScreenAnimationContext, ScreenFrameProducer, chladni_frame_delay, enter_screen_mode,
-    game_of_life_spec, leave_screen_mode, mandelbrot_frame_delay, matrix_frame_delay,
-    physarum_frame_delay, primordial_frame_delay, render_screen_frame, terminal_height,
-    terminal_width,
+    PHYSARUM_STYLE, PLASMA_STYLE, PRIMORDIAL_STYLE, PhysarumAnimation, PlasmaAnimation,
+    PrimordialAnimation, ScreenAnimationContext, ScreenFrameProducer, chladni_frame_delay,
+    enter_screen_mode, game_of_life_spec, leave_screen_mode, mandelbrot_frame_delay,
+    matrix_frame_delay, physarum_frame_delay, plasma_frame_delay, primordial_frame_delay,
+    render_screen_frame, terminal_height, terminal_width,
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -21,6 +21,7 @@ enum ExampleStyle {
     Primordial,
     Physarum,
     Chladni,
+    Plasma,
 }
 
 struct ScreenModeGuard;
@@ -83,6 +84,9 @@ fn resolve_style(raw: &str) -> Result<ExampleStyle, io::Error> {
     if normalized == CHLADNI_STYLE {
         return Ok(ExampleStyle::Chladni);
     }
+    if normalized == PLASMA_STYLE {
+        return Ok(ExampleStyle::Plasma);
+    }
     if let Some(style) = GAME_OF_LIFE_RANDOM_STYLES
         .iter()
         .find(|candidate| **candidate == normalized)
@@ -94,7 +98,7 @@ fn resolve_style(raw: &str) -> Result<ExampleStyle, io::Error> {
     Err(io::Error::new(
         io::ErrorKind::InvalidInput,
         format!(
-            "unsupported style `{normalized}`; expected boids, boids_predator, boids_schools, friends_and_enemies, primordial, physarum, chladni, mandelbrot, matrix, game_of_life_gliders, or game_of_life_tumblers"
+            "unsupported style `{normalized}`; expected boids, boids_predator, boids_schools, friends_and_enemies, primordial, physarum, chladni, plasma, mandelbrot, matrix, game_of_life_gliders, or game_of_life_tumblers"
         ),
     ))
 }
@@ -118,6 +122,7 @@ fn build_animation(style: ExampleStyle) -> Box<dyn ScreenFrameProducer> {
         ExampleStyle::Primordial => Box::new(PrimordialAnimation::new(context)),
         ExampleStyle::Physarum => Box::new(PhysarumAnimation::new(context)),
         ExampleStyle::Chladni => Box::new(ChladniAnimation::new(context)),
+        ExampleStyle::Plasma => Box::new(PlasmaAnimation::new(context)),
     }
 }
 
@@ -133,6 +138,7 @@ fn context_for_style(style: ExampleStyle, width: usize, height: usize) -> Screen
         | ExampleStyle::Primordial
         | ExampleStyle::Physarum
         | ExampleStyle::Chladni
+        | ExampleStyle::Plasma
         | ExampleStyle::Mandelbrot
         | ExampleStyle::Matrix => width,
     };
@@ -166,6 +172,7 @@ fn frame_delay(style: ExampleStyle) -> Duration {
         ExampleStyle::Primordial => primordial_frame_delay(),
         ExampleStyle::Physarum => physarum_frame_delay(),
         ExampleStyle::Chladni => chladni_frame_delay(),
+        ExampleStyle::Plasma => plasma_frame_delay(),
         ExampleStyle::GameOfLife(_) => Duration::from_millis(160),
     }
 }
