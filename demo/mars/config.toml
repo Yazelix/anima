@@ -1,0 +1,18 @@
+line-height = 1.12
+
+[effects]
+trail-cursor = false
+
+[window]
+width = 960
+height = 540
+decorations = "Disabled"
+opacity = 1.0
+blur = false
+
+[fonts]
+family = "JetBrains Mono"
+size = 14.0
+
+[mars.appearance]
+preset = "dark"

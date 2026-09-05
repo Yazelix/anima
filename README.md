@@ -3,6 +3,8 @@
 Anima is a standalone terminal animation toolkit from Yazelix. It works in any
 capable terminal; no Yazelix installation is required.
 
+![Primordial particles, a Mandelbrot dive, Matrix rain, and Game of Life tumblers in Anima](assets/anima.gif)
+
 The user-facing command is `yzs`
 
 ```bash
@@ -193,6 +195,21 @@ v0.1.0
 ```
 
 ## Verification
+
+The README montage is recorded from the local `yzs` package through
+[Kinestra](https://github.com/Yazelix/kinestra) and a pinned Mars terminal:
+
+```sh
+nix run .#record-demo
+```
+
+Run this from the repository root on x86_64 Linux. Each animation warms up before
+a two-second excerpt is recorded; the eight-second GIF is 640 by 360 pixels at
+10 FPS. [The still preview](assets/anima-poster.png) is also available. The
+Rust recipe is `demo/record.rs`; appearance settings live in `demo/mars/`.
+Nix compiles the recipe against the pinned Kinestra library. The intermediate MP4 stays in
+ignored `demo/.work/`. Recording tools are development-only and do not belong to
+the installed `yzs` closure. Kinestra and Mars revisions are pinned in `flake.lock`.
 
 From this repository:
 

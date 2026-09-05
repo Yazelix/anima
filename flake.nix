@@ -2,6 +2,9 @@
   description = "Anima: standalone terminal animations from Yazelix";
 
   inputs = {
+    kinestra.url = "github:Yazelix/kinestra";
+    recording-mars.url = "github:Yazelix/mars/21109e3ebc24b63da11bae644dfb9bab28ce0e18";
+    recording-mars.inputs.nixpkgs.url = "github:NixOS/nixpkgs/567a49d1913ce81ac6e9582e3553dd90a955875f";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     asciiquarium = {
       url = "github:cablehead/asciiquarium-rs/beef5b7dae179937c67f9e1557e02d64be55fa71";
@@ -19,6 +22,8 @@
       nixpkgs,
       asciiquarium,
       fenix,
+      kinestra,
+      recording-mars,
     }:
     let
       systems = [
@@ -99,20 +104,38 @@
         }
       );
 
-      apps = forAllSystems (system: {
-        default = {
-          type = "app";
-          program = "${self.packages.${system}.yzs}/bin/yzs";
-        };
-        yzs = {
-          type = "app";
-          program = "${self.packages.${system}.yzs}/bin/yzs";
-        };
-        yazelix_screen = {
-          type = "app";
-          program = "${self.packages.${system}.yzs}/bin/yzs";
-        };
-      });
+      apps = forAllSystems (
+        system:
+        {
+          default = {
+            type = "app";
+            program = "${self.packages.${system}.yzs}/bin/yzs";
+          };
+          yzs = {
+            type = "app";
+            program = "${self.packages.${system}.yzs}/bin/yzs";
+          };
+          yazelix_screen = {
+            type = "app";
+            program = "${self.packages.${system}.yzs}/bin/yzs";
+          };
+        }
+        // nixpkgs.lib.optionalAttrs (system == "x86_64-linux") {
+          record-demo = {
+            type = "app";
+            program = "${
+              kinestra.lib.${system}.mkRecorder {
+                name = "record-anima-demo";
+                recipe = ./demo/record.rs;
+                environment = {
+                  ANIMA_BIN = "${self.packages.${system}.yzs}/bin/yzs";
+                  ANIMA_MARS = recording-mars.packages.${system}.mars;
+                };
+              }
+            }/bin/record-anima-demo";
+          };
+        }
+      );
 
       checks = forAllSystems (system: {
         yzs = self.packages.${system}.yzs;

@@ -1,6 +1,7 @@
 target/
 result
 result-*
+demo/.work/
 
 # bv (beads viewer) local config and caches
 .bv/
