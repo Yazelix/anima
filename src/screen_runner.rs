@@ -1,14 +1,14 @@
 use crate::random::system_random_index;
 use crate::{
-    BoidsAnimation, BoidsVariant, CHLADNI_STYLE, ChladniAnimation, FRIENDS_AND_ENEMIES_STYLE,
-    FriendsAndEnemiesAnimation, GAME_OF_LIFE_RANDOM_STYLES, GameOfLifeAnimation,
-    GameOfLifeCellStyle, MANDELBROT_STYLE, MATRIX_STYLE, MandelbrotAnimation, MatrixAnimation,
-    PHYSARUM_STYLE, PLASMA_STYLE, PRIMORDIAL_STYLE, PhysarumAnimation, PlasmaAnimation,
-    PrimordialAnimation, RawModeGuard, ScreenAnimationContext, ScreenFrameProducer,
-    center_frame_lines, center_text, chladni_frame_delay, enter_screen_mode, game_of_life_spec,
-    leave_screen_mode, mandelbrot_frame_delay, matrix_frame_delay, physarum_frame_delay,
-    plasma_frame_delay, primordial_frame_delay, render_screen_frame, terminal_height,
-    terminal_width,
+    AQUARIUM_STYLE, AquariumAnimation, BoidsAnimation, BoidsVariant, CHLADNI_STYLE,
+    ChladniAnimation, FRIENDS_AND_ENEMIES_STYLE, FriendsAndEnemiesAnimation,
+    GAME_OF_LIFE_RANDOM_STYLES, GameOfLifeAnimation, GameOfLifeCellStyle, MANDELBROT_STYLE,
+    MATRIX_STYLE, MandelbrotAnimation, MatrixAnimation, PHYSARUM_STYLE, PLASMA_STYLE,
+    PRIMORDIAL_STYLE, PhysarumAnimation, PlasmaAnimation, PrimordialAnimation, RawModeGuard,
+    ScreenAnimationContext, ScreenFrameProducer, aquarium_frame_delay, center_frame_lines,
+    center_text, chladni_frame_delay, enter_screen_mode, game_of_life_spec, leave_screen_mode,
+    mandelbrot_frame_delay, matrix_frame_delay, physarum_frame_delay, plasma_frame_delay,
+    primordial_frame_delay, render_screen_frame, terminal_height, terminal_width,
 };
 use crossterm::event::{self, KeyCode, KeyEvent, KeyEventKind};
 use std::fmt::Write as _;
@@ -28,6 +28,7 @@ pub const SCREEN_STYLES: &[&str] = &[
     STATIC_STYLE,
     LOGO_STYLE,
     ASCIQUARIUM_STYLE,
+    AQUARIUM_STYLE,
     "boids",
     "boids_predator",
     "boids_schools",
@@ -43,6 +44,7 @@ pub const SCREEN_STYLES: &[&str] = &[
 ];
 pub const SCREEN_RANDOM_STYLES: &[&str] = &[
     ASCIQUARIUM_STYLE,
+    AQUARIUM_STYLE,
     "boids",
     "boids_predator",
     "boids_schools",
@@ -67,6 +69,7 @@ enum ScreenStyle {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum AnimationStyle {
+    Aquarium,
     Boids(BoidsVariant),
     GameOfLife(&'static str),
     FriendsAndEnemies,
@@ -79,6 +82,7 @@ enum AnimationStyle {
 }
 
 const ANIMATION_STYLES: &[AnimationStyle] = &[
+    AnimationStyle::Aquarium,
     AnimationStyle::Boids(BoidsVariant::Predator),
     AnimationStyle::Boids(BoidsVariant::Schools),
     AnimationStyle::FriendsAndEnemies,
@@ -260,6 +264,9 @@ fn resolve_style(
     }
     if normalized == ASCIQUARIUM_STYLE {
         return Ok(ScreenStyle::Asciiquarium);
+    }
+    if normalized == AQUARIUM_STYLE {
+        return Ok(ScreenStyle::Animation(AnimationStyle::Aquarium));
     }
     if let Some(variant) = BoidsVariant::from_style_name(&normalized) {
         return Ok(ScreenStyle::Animation(AnimationStyle::Boids(variant)));
@@ -528,6 +535,7 @@ fn run_animation(
 // not authorship of Anima's Rust implementation.
 fn animation_credit(style: AnimationStyle) -> (&'static str, &'static str) {
     match style {
+        AnimationStyle::Aquarium => ("Aquarium", "Original art and motion by Anima"),
         AnimationStyle::Boids(BoidsVariant::Predator) => {
             ("Boids: Predator", "Model by Craig Reynolds")
         }
@@ -651,6 +659,7 @@ fn build_animation(
 ) -> Box<dyn ScreenFrameProducer> {
     let context = context_for_style(style, width, height);
     match style {
+        AnimationStyle::Aquarium => Box::new(AquariumAnimation::new(context)),
         AnimationStyle::Boids(variant) => {
             Box::new(BoidsAnimation::with_variant(context, cell_style, variant))
         }
@@ -670,7 +679,8 @@ fn build_animation(
 fn context_for_style(style: AnimationStyle, width: usize, height: usize) -> ScreenAnimationContext {
     match style {
         AnimationStyle::GameOfLife(_) => game_of_life_context(width, height),
-        AnimationStyle::Boids(_)
+        AnimationStyle::Aquarium
+        | AnimationStyle::Boids(_)
         | AnimationStyle::FriendsAndEnemies
         | AnimationStyle::Primordial
         | AnimationStyle::Physarum
@@ -703,6 +713,7 @@ fn full_screen_context(width: usize, height: usize) -> ScreenAnimationContext {
 
 fn frame_delay(style: AnimationStyle) -> Duration {
     match style {
+        AnimationStyle::Aquarium => aquarium_frame_delay(),
         AnimationStyle::Boids(_) => Duration::from_millis(70),
         AnimationStyle::FriendsAndEnemies => Duration::from_millis(55),
         AnimationStyle::Primordial => primordial_frame_delay(),
@@ -1039,6 +1050,20 @@ mod tests {
         for style in SCREEN_STYLES {
             assert!(resolve_style(style, None, "anima").is_ok());
         }
+        assert_eq!(
+            resolve_style(" AQUARIUM ", None, "anima"),
+            Ok(ScreenStyle::Animation(AnimationStyle::Aquarium))
+        );
+        assert_eq!(
+            build_animation(
+                AnimationStyle::Aquarium,
+                40,
+                12,
+                GameOfLifeCellStyle::FullBlock
+            )
+            .render_frame(),
+            AquariumAnimation::new(full_screen_context(40, 12)).render_frame()
+        );
         assert!(matches!(
             resolve_style(" PHYSARUM ", None, "anima"),
             Ok(ScreenStyle::Animation(AnimationStyle::Physarum))
@@ -1146,6 +1171,7 @@ mod tests {
         assert_eq!(
             ANIMATION_STYLES,
             &[
+                AnimationStyle::Aquarium,
                 AnimationStyle::Boids(BoidsVariant::Predator),
                 AnimationStyle::Boids(BoidsVariant::Schools),
                 AnimationStyle::FriendsAndEnemies,

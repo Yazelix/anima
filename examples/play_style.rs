@@ -1,11 +1,12 @@
 use std::{io, thread, time::Duration};
 
 use yazelix_screen::{
-    BoidsAnimation, BoidsVariant, CHLADNI_STYLE, ChladniAnimation, FRIENDS_AND_ENEMIES_STYLE,
-    FriendsAndEnemiesAnimation, GAME_OF_LIFE_RANDOM_STYLES, GameOfLifeAnimation,
-    GameOfLifeCellStyle, MANDELBROT_STYLE, MATRIX_STYLE, MandelbrotAnimation, MatrixAnimation,
-    PHYSARUM_STYLE, PLASMA_STYLE, PRIMORDIAL_STYLE, PhysarumAnimation, PlasmaAnimation,
-    PrimordialAnimation, ScreenAnimationContext, ScreenFrameProducer, chladni_frame_delay,
+    AQUARIUM_STYLE, AquariumAnimation, BoidsAnimation, BoidsVariant, CHLADNI_STYLE,
+    ChladniAnimation, FRIENDS_AND_ENEMIES_STYLE, FriendsAndEnemiesAnimation,
+    GAME_OF_LIFE_RANDOM_STYLES, GameOfLifeAnimation, GameOfLifeCellStyle, MANDELBROT_STYLE,
+    MATRIX_STYLE, MandelbrotAnimation, MatrixAnimation, PHYSARUM_STYLE, PLASMA_STYLE,
+    PRIMORDIAL_STYLE, PhysarumAnimation, PlasmaAnimation, PrimordialAnimation,
+    ScreenAnimationContext, ScreenFrameProducer, aquarium_frame_delay, chladni_frame_delay,
     enter_screen_mode, game_of_life_spec, leave_screen_mode, mandelbrot_frame_delay,
     matrix_frame_delay, physarum_frame_delay, plasma_frame_delay, primordial_frame_delay,
     render_screen_frame, terminal_height, terminal_width,
@@ -13,6 +14,7 @@ use yazelix_screen::{
 
 #[derive(Debug, Clone, Copy)]
 enum ExampleStyle {
+    Aquarium,
     Boids(BoidsVariant),
     FriendsAndEnemies,
     GameOfLife(&'static str),
@@ -63,6 +65,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 fn resolve_style(raw: &str) -> Result<ExampleStyle, io::Error> {
     let normalized = raw.trim().to_ascii_lowercase();
+    if normalized == AQUARIUM_STYLE {
+        return Ok(ExampleStyle::Aquarium);
+    }
     if let Some(variant) = BoidsVariant::from_style_name(&normalized) {
         return Ok(ExampleStyle::Boids(variant));
     }
@@ -98,7 +103,7 @@ fn resolve_style(raw: &str) -> Result<ExampleStyle, io::Error> {
     Err(io::Error::new(
         io::ErrorKind::InvalidInput,
         format!(
-            "unsupported style `{normalized}`; expected boids, boids_predator, boids_schools, friends_and_enemies, primordial, physarum, chladni, plasma, mandelbrot, matrix, game_of_life_gliders, or game_of_life_tumblers"
+            "unsupported style `{normalized}`; expected aquarium, boids, boids_predator, boids_schools, friends_and_enemies, primordial, physarum, chladni, plasma, mandelbrot, matrix, game_of_life_gliders, or game_of_life_tumblers"
         ),
     ))
 }
@@ -106,6 +111,7 @@ fn resolve_style(raw: &str) -> Result<ExampleStyle, io::Error> {
 fn build_animation(style: ExampleStyle) -> Box<dyn ScreenFrameProducer> {
     let context = context_for_style(style, terminal_width(), terminal_height());
     match style {
+        ExampleStyle::Aquarium => Box::new(AquariumAnimation::new(context)),
         ExampleStyle::Boids(variant) => Box::new(BoidsAnimation::with_variant(
             context,
             GameOfLifeCellStyle::FullBlock,
@@ -133,7 +139,8 @@ fn context_for_style(style: ExampleStyle, width: usize, height: usize) -> Screen
             let spec = game_of_life_spec(size_class);
             width.saturating_sub(6).max(spec.minimum_inner_width)
         }
-        ExampleStyle::Boids(_)
+        ExampleStyle::Aquarium
+        | ExampleStyle::Boids(_)
         | ExampleStyle::FriendsAndEnemies
         | ExampleStyle::Primordial
         | ExampleStyle::Physarum
@@ -165,6 +172,7 @@ fn size_class(width: usize) -> &'static str {
 
 fn frame_delay(style: ExampleStyle) -> Duration {
     match style {
+        ExampleStyle::Aquarium => aquarium_frame_delay(),
         ExampleStyle::Boids(_) => Duration::from_millis(70),
         ExampleStyle::FriendsAndEnemies => Duration::from_millis(55),
         ExampleStyle::Mandelbrot => mandelbrot_frame_delay(),

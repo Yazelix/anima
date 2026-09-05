@@ -1,5 +1,6 @@
 //! Terminal screen primitives shared by Yazelix front-door animation surfaces.
 
+mod aquarium;
 mod boids;
 mod chladni;
 mod friends_and_enemies;
@@ -18,6 +19,7 @@ mod terminal_control;
 use crossterm::terminal;
 use std::io::{self, Write};
 
+pub use aquarium::{AQUARIUM_STYLE, AquariumAnimation, aquarium_frame_delay};
 pub use boids::{BoidsAnimation, BoidsVariant, is_boids_style};
 pub use chladni::{CHLADNI_STYLE, ChladniAnimation, chladni_frame_delay};
 pub use friends_and_enemies::{FRIENDS_AND_ENEMIES_STYLE, FriendsAndEnemiesAnimation};

@@ -13,6 +13,7 @@ const RANDOM_ANIMATION_FAMILIES: &[&[&str]] = &[
     &[crate::physarum::PHYSARUM_STYLE],
     &[crate::chladni::CHLADNI_STYLE],
     &[crate::plasma::PLASMA_STYLE],
+    &[crate::aquarium::AQUARIUM_STYLE],
 ];
 
 pub fn random_animation_slot_count() -> usize {
@@ -114,6 +115,7 @@ mod tests {
                 (crate::physarum::PHYSARUM_STYLE, 2),
                 (crate::chladni::CHLADNI_STYLE, 2),
                 (crate::plasma::PLASMA_STYLE, 2),
+                (crate::aquarium::AQUARIUM_STYLE, 2),
             ])
         );
         let mut advertised = random_animation_styles();

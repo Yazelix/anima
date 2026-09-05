@@ -26,6 +26,7 @@ fn record(r: &mut Recorder) -> Result<()> {
     let styles = [
         ("logo", 4),
         ("asciiquarium", 4),
+        ("aquarium", 4),
         ("boids_predator", 4),
         ("boids_schools", 4),
         ("friends_and_enemies", 4),
