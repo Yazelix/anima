@@ -36,11 +36,27 @@
       yzsPackage =
         system: pkgs:
         let
+          # Match https://index.crates.io/config.json without defining a second Cargo source.
+          # Remove when pinned nixpkgs uses this download base itself.
+          importCargoLock = pkgs.rustPlatform.importCargoLock.override {
+            fetchurl =
+              args:
+              pkgs.fetchurl (
+                args
+                // {
+                  url =
+                    builtins.replaceStrings
+                      [ "https://crates.io/api/v1/crates/" ]
+                      [ "https://static.crates.io/crates/" ]
+                      args.url;
+                }
+              );
+          };
           aquarium = pkgs.rustPlatform.buildRustPackage {
             pname = "asciiquarium-rs";
             version = "0.1.1-dev";
             src = asciiquarium;
-            cargoLock.lockFile = "${asciiquarium}/Cargo.lock";
+            cargoDeps = importCargoLock { lockFile = "${asciiquarium}/Cargo.lock"; };
 
             meta = {
               description = "Aquarium animation in ASCII art";
@@ -73,7 +89,7 @@
           version = "0.1.0";
 
           src = source;
-          cargoLock.lockFile = ./Cargo.lock;
+          cargoDeps = importCargoLock { lockFile = ./Cargo.lock; };
           cargoBuildFlags = [
             "--bin"
             "yzs"
