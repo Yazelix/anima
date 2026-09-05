@@ -7,20 +7,21 @@ capable terminal; no Yazelix installation is required.
 
 [See every animation](#animation-gallery).
 
-The user-facing command is `yzs`
+The user-facing command is `anima`. The named Nix package/app is `anima`;
+the default Nix entry points select the same executable.
 
 ```bash
-nix run github:Yazelix/anima#yzs
-nix run github:Yazelix/anima#yzs -- static
-nix run github:Yazelix/anima#yzs -- asciiquarium --duration-seconds 3
-nix run github:Yazelix/anima#yzs -- mandelbrot
-nix run github:Yazelix/anima#yzs -- friends_and_enemies
-nix run github:Yazelix/anima#yzs -- primordial
-nix run github:Yazelix/anima#yzs -- physarum
-nix run github:Yazelix/anima#yzs -- chladni
-nix run github:Yazelix/anima#yzs -- plasma
-nix run github:Yazelix/anima#yzs -- game_of_life_tumblers --cell-style dotted
-nix run github:Yazelix/anima#yzs -- random --duration-seconds 3
+nix run github:Yazelix/anima#anima
+nix run github:Yazelix/anima#anima -- static
+nix run github:Yazelix/anima#anima -- asciiquarium --duration-seconds 3
+nix run github:Yazelix/anima#anima -- mandelbrot
+nix run github:Yazelix/anima#anima -- friends_and_enemies
+nix run github:Yazelix/anima#anima -- primordial
+nix run github:Yazelix/anima#anima -- physarum
+nix run github:Yazelix/anima#anima -- chladni
+nix run github:Yazelix/anima#anima -- plasma
+nix run github:Yazelix/anima#anima -- game_of_life_tumblers --cell-style dotted
+nix run github:Yazelix/anima#anima -- random --duration-seconds 3
 ```
 
 ## What It Contains
@@ -31,7 +32,7 @@ nix run github:Yazelix/anima#yzs -- random --duration-seconds 3
 - File-backed Kitty PNG frame sequence rendering
 - Frame production through `ScreenFrameProducer`
 - Terminal sizing helpers and alternate-screen rendering helpers
-- A standalone `yzs` binary with interactive and timed playback
+- A standalone `anima` binary with interactive and timed playback
 - Small examples for library consumers
 
 ## Special Thanks
@@ -69,18 +70,18 @@ Special thanks to:
 Installed standalone command:
 
 ```bash
-yzs --help
-yzs
-yzs static
-yzs asciiquarium --duration-seconds 3
-yzs friends_and_enemies --duration-seconds 3
-yzs primordial --duration-seconds 3
-yzs physarum --duration-seconds 3
-yzs chladni --duration-seconds 3
-yzs plasma --duration-seconds 3
-yzs mandelbrot
-yzs game_of_life_tumblers --cell-style dotted
-yzs random --duration-seconds 3
+anima --help
+anima
+anima static
+anima asciiquarium --duration-seconds 3
+anima friends_and_enemies --duration-seconds 3
+anima primordial --duration-seconds 3
+anima physarum --duration-seconds 3
+anima chladni --duration-seconds 3
+anima plasma --duration-seconds 3
+anima mandelbrot
+anima game_of_life_tumblers --cell-style dotted
+anima random --duration-seconds 3
 ```
 
 Nova users get the integrated animation surface through the main command:
@@ -95,17 +96,17 @@ yzx anima chladni
 From this repository:
 
 ```bash
-cargo run --bin yzs -- --help
-cargo run --bin yzs -- static
-cargo run --bin yzs -- asciiquarium --duration-seconds 3
-cargo run --bin yzs -- friends_and_enemies --duration-seconds 3
-cargo run --bin yzs -- primordial --duration-seconds 3
-cargo run --bin yzs -- physarum --duration-seconds 3
-cargo run --bin yzs -- chladni --duration-seconds 3
-cargo run --bin yzs -- plasma --duration-seconds 3
-cargo run --bin yzs -- mandelbrot
-cargo run --bin yzs -- game_of_life_tumblers --cell-style dotted
-cargo run --bin yzs -- random --duration-seconds 3
+cargo run --bin anima -- --help
+cargo run --bin anima -- static
+cargo run --bin anima -- asciiquarium --duration-seconds 3
+cargo run --bin anima -- friends_and_enemies --duration-seconds 3
+cargo run --bin anima -- primordial --duration-seconds 3
+cargo run --bin anima -- physarum --duration-seconds 3
+cargo run --bin anima -- chladni --duration-seconds 3
+cargo run --bin anima -- plasma --duration-seconds 3
+cargo run --bin anima -- mandelbrot
+cargo run --bin anima -- game_of_life_tumblers --cell-style dotted
+cargo run --bin anima -- random --duration-seconds 3
 ```
 
 Source-only Cargo runs resolve `asciiquarium-rs` from `PATH`; Nix runs use the
@@ -114,17 +115,17 @@ pinned upstream executable
 With Nix:
 
 ```bash
-nix build .#yzs
-nix run .#yzs -- --help
-nix run .#yzs -- static
-nix run .#yzs -- asciiquarium --duration-seconds 3
-nix run .#yzs -- friends_and_enemies --duration-seconds 3
-nix run .#yzs -- primordial --duration-seconds 3
-nix run .#yzs -- physarum --duration-seconds 3
-nix run .#yzs -- chladni --duration-seconds 3
-nix run .#yzs -- plasma --duration-seconds 3
-nix run .#yzs -- mandelbrot
-nix run .#yzs -- random --duration-seconds 3
+nix build .#anima
+nix run .#anima -- --help
+nix run .#anima -- static
+nix run .#anima -- asciiquarium --duration-seconds 3
+nix run .#anima -- friends_and_enemies --duration-seconds 3
+nix run .#anima -- primordial --duration-seconds 3
+nix run .#anima -- physarum --duration-seconds 3
+nix run .#anima -- chladni --duration-seconds 3
+nix run .#anima -- plasma --duration-seconds 3
+nix run .#anima -- mandelbrot
+nix run .#anima -- random --duration-seconds 3
 ```
 
 The [gallery](#animation-gallery) shows every distinct animation. `boids` is an
@@ -173,7 +174,7 @@ The aquarium runs as a separate
 its GPL-2.0-or-later license. Its upstream [credit and
 lineage](https://github.com/cablehead/asciiquarium-rs#credit-and-lineage) section
 traces it to Kirk Baucom's original Perl program, Joan Stark's ASCII art,
-Claudio Matsuoka's additions, and `cablehead`'s Rust port. `yzs` supplies the same
+Claudio Matsuoka's additions, and `cablehead`'s Rust port. `anima` supplies the same
 any-key exit and optional duration contract used by its native styles without
 copying or linking the aquarium implementation. The packaged upstream revision
 exits cleanly when its terminal disappears, so closing the containing terminal
@@ -186,79 +187,79 @@ Run the command above a GIF to watch that style in your terminal.
 
 ### Logo
 
-`yzs logo`
+`anima logo`
 
 ![Yazelix welcome card cycling through its title and colored text](assets/animations/logo.gif)
 
 ### Aquarium
 
-`yzs asciiquarium`
+`anima asciiquarium`
 
 ![ASCII fish swimming past seaweed and rising bubbles](assets/animations/asciiquarium.gif)
 
 ### Boids: Predator
 
-`yzs boids_predator` (alias: `yzs boids`)
+`anima boids_predator` (alias: `anima boids`)
 
 ![Colored flocks scattering around a pursuing predator](assets/animations/boids_predator.gif)
 
 ### Boids: Schools
 
-`yzs boids_schools`
+`anima boids_schools`
 
 ![Schools of colored particles turning and swimming together](assets/animations/boids_schools.gif)
 
 ### Friends and Enemies
 
-`yzs friends_and_enemies`
+`anima friends_and_enemies`
 
 ![Dense colored particles chasing friends and avoiding enemies](assets/animations/friends_and_enemies.gif)
 
 ### Primordial
 
-`yzs primordial`
+`anima primordial`
 
 ![Bright green particles moving across a dark field](assets/animations/primordial.gif)
 
 ### Physarum
 
-`yzs physarum`
+`anima physarum`
 
 ![Glowing trails joining into a branching transport network](assets/animations/physarum.gif)
 
 ### Chladni
 
-`yzs chladni`
+`anima chladni`
 
 ![Warm nodal lines shifting between blue and violet standing-wave patterns](assets/animations/chladni.gif)
 
 ### Plasma
 
-`yzs plasma`
+`anima plasma`
 
 ![Flowing colored bands formed by overlapping sine waves](assets/animations/plasma.gif)
 
 ### Mandelbrot
 
-`yzs mandelbrot`
+`anima mandelbrot`
 
 ![A colorful zoom into the branching edge of the Mandelbrot set](assets/animations/mandelbrot.gif)
 
 ### Matrix
 
-`yzs matrix`
+`anima matrix`
 
 ![Green columns of glowing characters falling across the terminal](assets/animations/matrix.gif)
 
 ### Game of Life: Gliders
 
-`yzs game_of_life_gliders`
+`anima game_of_life_gliders`
 
 ![Small colored gliders traveling diagonally across a dark field](assets/animations/game_of_life_gliders.gif)
 
 ### Game of Life: Tumblers
 
-`yzs game_of_life_tumblers`
+`anima game_of_life_tumblers`
 
 ![Rows of colored block patterns oscillating in Conway's Game of Life](assets/animations/game_of_life_tumblers.gif)
 
@@ -299,12 +300,12 @@ The crate must not depend on:
 - Home Manager install state
 - Yazelix command palette or workspace orchestration
 
-Nova consumes this crate for integrated rendering. `yzx anima` is the integrated Nova command; `yzs` is the standalone command for terminal users who want only the screen animations
+Nova consumes this crate for integrated rendering. `yzx anima` is the integrated Nova command; `anima` is the standalone command for terminal users who want only the screen animations
 
 ## Surfaces
 
 - Product/repository: `anima`
-- Command: `yzs`
+- Command: `anima`
 - Rust crate: `yazelix_screen`
 - Integrated Nova command: `yzx anima`
 
@@ -315,12 +316,12 @@ External releases use SemVer. Breaking changes to frame producer traits, style n
 Component tags should use:
 
 ```text
-v0.1.0
+v0.2.0
 ```
 
 ## Verification
 
-The gallery and hero montage are recorded from the local `yzs` package through
+The gallery and hero montage are recorded from the local `anima` package through
 [Kinestra](https://github.com/Yazelix/kinestra) and a pinned Mars terminal:
 
 ```sh
@@ -344,7 +345,7 @@ do not need separate previews.
 
 Nix compiles the recipe against the pinned Kinestra library. Intermediate MP4s
 stay in ignored `demo/.work/`. Recording tools and gallery assets stay outside
-the installed `yzs` closure. Kinestra and Mars revisions are pinned in `flake.lock`.
+the installed `anima` closure. Kinestra and Mars revisions are pinned in `flake.lock`.
 
 From this repository:
 
@@ -352,8 +353,8 @@ From this repository:
 cargo fmt --all -- --check
 cargo check --examples
 cargo test
-cargo run --bin yzs -- --help
+cargo run --bin anima -- --help
 cargo run --example render_once
-nix build .#yzs
-nix run .#yzs -- --help
+nix build .#anima
+nix run .#anima -- --help
 ```

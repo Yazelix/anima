@@ -893,10 +893,10 @@ mod tests {
     #[test]
     fn supported_styles_resolve() {
         for style in SCREEN_STYLES {
-            assert!(resolve_style(style, None, "yzs").is_ok());
+            assert!(resolve_style(style, None, "anima").is_ok());
         }
         assert!(matches!(
-            resolve_style(" PHYSARUM ", None, "yzs"),
+            resolve_style(" PHYSARUM ", None, "anima"),
             Ok(ScreenStyle::Animation(AnimationStyle::Physarum))
         ));
         assert_eq!(
@@ -910,7 +910,7 @@ mod tests {
             PhysarumAnimation::new(full_screen_context(40, 12)).render_frame()
         );
         assert!(matches!(
-            resolve_style(" CHLADNI ", None, "yzs"),
+            resolve_style(" CHLADNI ", None, "anima"),
             Ok(ScreenStyle::Animation(AnimationStyle::Chladni))
         ));
         assert_eq!(
@@ -924,10 +924,10 @@ mod tests {
             ChladniAnimation::new(full_screen_context(40, 12)).render_frame()
         );
         for style in ["game_of_life_oscillators", "game_of_life_bloom"] {
-            assert!(resolve_style(style, None, "yzs").is_err());
+            assert!(resolve_style(style, None, "anima").is_err());
         }
         assert!(matches!(
-            resolve_style(" PLASMA ", None, "yzs"),
+            resolve_style(" PLASMA ", None, "anima"),
             Ok(ScreenStyle::Animation(AnimationStyle::Plasma))
         ));
         assert_eq!(
@@ -955,7 +955,7 @@ mod tests {
         ] {
             assert!(!SCREEN_RANDOM_STYLES.contains(&style));
             assert!(!crate::random_animation_styles().contains(&style));
-            assert!(resolve_style(style, None, "yzs").is_ok());
+            assert!(resolve_style(style, None, "anima").is_ok());
         }
     }
 
@@ -1024,7 +1024,7 @@ mod tests {
                 "--duration-seconds".to_string(),
                 "3".to_string(),
             ],
-            "yzs",
+            "anima",
         )
         .unwrap();
 

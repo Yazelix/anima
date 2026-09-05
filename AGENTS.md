@@ -9,7 +9,7 @@ Only Anima-specific guidance belongs here.
 
 ## Local Scope
 
-- This repo owns Anima's standalone `yzs` terminal animation engine and Rust crate.
+- This repo owns Anima's standalone `anima` terminal animation engine and Rust crate.
 - Nova owns integrated welcome/session policy and the `yzx anima` command surface.
 - Keep renderer behavior usable from a plain terminal without a Yazelix session.
 
@@ -18,9 +18,9 @@ Only Anima-specific guidance belongs here.
 - `cargo fmt --all -- --check`
 - `cargo test`
 - `cargo check --examples`
-- `cargo run --bin yzs -- --help`
+- `cargo run --bin anima -- --help`
 - `cargo run --example render_once`
-- `nix build .#yzs --no-link`
+- `nix build .#anima --no-link`
 
 ## Integration Notes
 

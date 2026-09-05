@@ -33,7 +33,7 @@
         "aarch64-darwin"
       ];
       forAllSystems = nixpkgs.lib.genAttrs systems;
-      yzsPackage =
+      animaPackage =
         system: pkgs:
         let
           # Match https://index.crates.io/config.json without defining a second Cargo source.
@@ -85,14 +85,14 @@
           };
         in
         rustPlatform.buildRustPackage {
-          pname = "yzs";
-          version = "0.1.0";
+          pname = "anima";
+          version = "0.2.0";
 
           src = source;
           cargoDeps = importCargoLock { lockFile = ./Cargo.lock; };
           cargoBuildFlags = [
             "--bin"
-            "yzs"
+            "anima"
           ];
           YZS_ASCIQUARIUM_BIN = "${aquarium}/bin/asciiquarium-rs";
 
@@ -102,7 +102,7 @@
             description = "Anima: standalone terminal animations from Yazelix";
             homepage = "https://github.com/Yazelix/anima";
             license = pkgs.lib.licenses.asl20;
-            mainProgram = "yzs";
+            mainProgram = "anima";
           };
         };
     in
@@ -111,30 +111,25 @@
         system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
-          yzs = yzsPackage system pkgs;
+          anima = animaPackage system pkgs;
         in
         {
-          default = yzs;
-          yzs = yzs;
-          yazelix_screen = yzs;
+          default = anima;
+          inherit anima;
         }
       );
 
       apps = forAllSystems (
         system:
+        let
+          anima = {
+            type = "app";
+            program = "${self.packages.${system}.anima}/bin/anima";
+          };
+        in
         {
-          default = {
-            type = "app";
-            program = "${self.packages.${system}.yzs}/bin/yzs";
-          };
-          yzs = {
-            type = "app";
-            program = "${self.packages.${system}.yzs}/bin/yzs";
-          };
-          yazelix_screen = {
-            type = "app";
-            program = "${self.packages.${system}.yzs}/bin/yzs";
-          };
+          default = anima;
+          inherit anima;
         }
         // nixpkgs.lib.optionalAttrs (system == "x86_64-linux") {
           record-demo = {
@@ -144,7 +139,7 @@
                 name = "record-anima-demo";
                 recipe = ./demo/record.rs;
                 environment = {
-                  ANIMA_BIN = "${self.packages.${system}.yzs}/bin/yzs";
+                  ANIMA_BIN = "${self.packages.${system}.anima}/bin/anima";
                   ANIMA_MARS = recording-mars.packages.${system}.mars;
                 };
               }
@@ -154,7 +149,7 @@
       );
 
       checks = forAllSystems (system: {
-        yzs = self.packages.${system}.yzs;
+        anima = self.packages.${system}.anima;
       });
     };
 }

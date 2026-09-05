@@ -48,7 +48,7 @@ fn record(r: &mut Recorder) -> Result<()> {
         .filter(|style| !["static", "boids", "random"].contains(style));
     if !listed.eq(styles.iter().map(|(style, _)| *style)) {
         return Err(Error::Invalid(
-            "update the gallery recipe and README to match packaged yzs styles".into(),
+            "update the gallery recipe and README to match packaged anima styles".into(),
         ));
     }
     r.display(Size::new(960, 540)?, None)?;

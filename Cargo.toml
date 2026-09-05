@@ -1,19 +1,19 @@
 [package]
 name = "yazelix_screen"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.94"
 description = "Anima: standalone terminal animations from Yazelix"
 license = "Apache-2.0"
 repository = "https://github.com/Yazelix/anima"
 readme = "README.md"
-include = ["src/**", "examples/**", "Cargo.lock", "README.md", "LICENSE"]
+include = ["src/**", "tests/**", "examples/**", "Cargo.lock", "README.md", "LICENSE"]
 keywords = ["animation", "terminal", "tui", "yazelix"]
 categories = ["command-line-utilities"]
 
 [[bin]]
-name = "yzs"
-path = "src/bin/yzs.rs"
+name = "anima"
+path = "src/bin/anima.rs"
 
 [dependencies]
 crossterm = "0.29"
