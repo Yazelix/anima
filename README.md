@@ -140,7 +140,9 @@ credit, and `←/h previous · l/→ next` on startup and after switching styles
 Its text and border fade in for one second, hold for two, then fade out for
 one. Short timed sessions scale that sequence to the remaining time;
 switching does not extend the session. The RGB fade uses an opaque black
-backing for contrast. Credits wrap in narrow terminals; the card stays hidden
+backing inside the border for contrast; border cells use the terminal's normal
+background so the fill does not extend outside the rounded outline.
+Credits wrap in narrow terminals; the card stays hidden
 if the complete text cannot fit. Static, logo, and the separate aquarium
 process do not use this card. Library frame producers return animation-only
 frames

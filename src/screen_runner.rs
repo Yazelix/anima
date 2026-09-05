@@ -501,17 +501,17 @@ fn identity_card(style: AnimationStyle, width: usize, height: usize, intensity: 
     rows.extend(
         lines
             .into_iter()
-            .map(|(line, color)| (format!("│ {line:<inner$} │"), color)),
+            .map(|(line, color)| (format!("│\x1b[48;2;0;0;0m {line:<inner$} \x1b[49m│"), color)),
     );
     rows.push((format!("╰{}╯", "─".repeat(inner + 2)), border));
     let mut output = String::new();
-    // Terminal cells have no alpha channel. Fade text/border RGB against a dark
-    // backing, which keeps the held card legible on light and animated backgrounds.
+    // Terminal cells have no alpha channel. Only the interior gets black backing;
+    // default-background border cells keep it from spilling outside the outline.
     for (row, (line, color)) in rows.into_iter().enumerate() {
         let [r, g, b] = color.map(|channel| (channel as f64 * intensity).round() as u8);
         write!(
             output,
-            "\x1b[{};3H\x1b[0m\x1b[48;2;0;0;0m\x1b[38;2;{r};{g};{b}m{line}\x1b[0m",
+            "\x1b[{};3H\x1b[0m\x1b[38;2;{r};{g};{b}m{line}\x1b[0m",
             row + 2
         )
         .expect("writing to a String");
@@ -877,6 +877,26 @@ mod tests {
                 let text = lines.join(" ").replace(['│', '╭', '╮', '╰', '╯', '─'], " ");
                 let text = text.split_whitespace().collect::<Vec<_>>().join(" ");
                 assert_eq!(text, format!("{title} {credit} {BROWSE_HINT}"));
+
+                // Interpret the emitted background state: glyphs cannot clip
+                // their rectangular cells, so black must stay inside the border.
+                let mut black = true;
+                for sequence in card.split("\x1b[").skip(1) {
+                    let end = sequence.find(|ch: char| ch.is_ascii_alphabetic()).unwrap();
+                    let (parameters, content) = sequence.split_at(end);
+                    if content.starts_with('m') {
+                        match parameters {
+                            "0" | "49" => black = false,
+                            "48;2;0;0;0" => black = true,
+                            _ => {}
+                        }
+                    }
+                    for glyph in content[1..].chars() {
+                        let border = "│╭╮╰╯─".contains(glyph);
+                        assert_eq!(black, !border, "background behind {glyph:?}");
+                    }
+                }
+                assert!(!black, "the card must restore the background");
             }
             for (width, height) in [(0, 0), (1, 1), (8, 24), (80, 3)] {
                 assert!(identity_card(style, width, height, 1.0).is_empty());
