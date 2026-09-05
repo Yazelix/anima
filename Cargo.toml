@@ -17,3 +17,6 @@ path = "src/bin/anima.rs"
 
 [dependencies]
 crossterm = "0.29"
+
+[target.'cfg(unix)'.dependencies]
+signal-hook = { version = "0.3", default-features = false }

@@ -328,4 +328,5 @@ name = "yazelix_screen"
 version = "0.2.0"
 dependencies = [
  "crossterm",
+ "signal-hook",
 ]

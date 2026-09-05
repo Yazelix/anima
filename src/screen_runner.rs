@@ -12,8 +12,13 @@ use crate::{
 };
 use crossterm::event::{self, KeyCode, KeyEvent, KeyEventKind};
 use std::fmt::Write as _;
-use std::io::{self, Write};
-use std::process::Command;
+use std::io::{self, IsTerminal, Write};
+use std::process::{Child, Command};
+#[cfg(unix)]
+use std::sync::{
+    Arc, OnceLock,
+    atomic::{AtomicBool, Ordering},
+};
 use std::time::{Duration, Instant};
 
 pub const ASCIQUARIUM_STYLE: &str = "asciiquarium";
@@ -52,6 +57,7 @@ pub const SCREEN_RANDOM_STYLES: &[&str] = &[
     "game_of_life_tumblers",
 ];
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ScreenStyle {
     Static,
     Logo,
@@ -106,6 +112,27 @@ struct ScreenArgs {
 
 struct ScreenModeGuard;
 
+// Process-lifetime CLI handlers: signal-hook cannot restore default handlers by
+// unregistering them. Library frame producers never install these handlers.
+#[cfg(unix)]
+static TERMINATED: OnceLock<Result<Arc<AtomicBool>, String>> = OnceLock::new();
+
+fn install_termination_handlers() -> Result<(), String> {
+    #[cfg(unix)]
+    TERMINATED
+        .get_or_init(|| {
+            let stopped = Arc::new(AtomicBool::new(false));
+            for signal in signal_hook::consts::TERM_SIGNALS {
+                signal_hook::flag::register(*signal, Arc::clone(&stopped))
+                    .map_err(|error| format!("could not handle terminal shutdown: {error}"))?;
+            }
+            Ok(stopped)
+        })
+        .as_ref()
+        .map_err(Clone::clone)?;
+    Ok(())
+}
+
 impl ScreenModeGuard {
     fn new() -> Result<Self, String> {
         enter_screen_mode()
@@ -131,11 +158,12 @@ pub fn run_screen_cli(
     }
 
     match resolve_style(&parsed.style, None, command_name)? {
-        ScreenStyle::Asciiquarium => run_asciiquarium(parsed.duration),
         ScreenStyle::Static => run_in_screen_mode(|| run_static(parsed.duration)),
         ScreenStyle::Logo => run_in_screen_mode(|| run_logo(parsed.duration)),
-        ScreenStyle::Animation(style) => {
-            run_in_screen_mode(|| run_animation(style, parsed.cell_style, parsed.duration))
+        style => {
+            let timing = parsed.duration.map(|duration| (Instant::now(), duration));
+            install_termination_handlers()?;
+            run_in_screen_mode(|| run_animations(style, parsed.cell_style, timing))
         }
     }
 }
@@ -203,7 +231,7 @@ fn parse_screen_args(
 
 fn print_screen_help(command_name: &str) -> Result<(), String> {
     let help = format!(
-        "Show Yazelix terminal screen animations\n\nUsage:\n  {command_name} [STYLE] [--cell-style full_block|dotted] [--duration-seconds N]\n\nStyles:\n  {}\n  random\n\nNotes:\n  Native animations: Left/h/p = previous; Right/l/n = next; any other key = exit\n  Other styles: any key = exit\n",
+        "Show Yazelix terminal screen animations\n\nUsage:\n  {command_name} [STYLE] [--cell-style full_block|dotted] [--duration-seconds N]\n\nStyles:\n  {}\n  random\n\nNotes:\n  Animations, including Aquarium: Left/h/p = previous; Right/l/n = next; any other key = exit\n  Static and logo: any key = exit\n",
         SCREEN_STYLES.join("\n  ")
     );
     let stdout = io::stdout();
@@ -274,21 +302,98 @@ fn random_screen_style(random_index: Option<usize>) -> &'static str {
     SCREEN_RANDOM_STYLES[index % SCREEN_RANDOM_STYLES.len()]
 }
 
-fn run_asciiquarium(duration: Option<Duration>) -> Result<(), String> {
-    let mut command = Command::new(option_env!("YZS_ASCIQUARIUM_BIN").unwrap_or("asciiquarium-rs"));
-    command.arg("--exit-on-any-key");
-    if let Some(duration) = duration {
-        command
-            .arg("--duration-seconds")
-            .arg(duration.as_secs().to_string());
+struct AquariumChild(Child);
+
+impl Drop for AquariumChild {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
     }
-    let status = command
-        .status()
-        .map_err(|error| format!("could not launch asciiquarium: {error}"))?;
-    if status.success() {
-        Ok(())
-    } else {
-        Err(format!("asciiquarium exited with {status}"))
+}
+
+fn remaining(timing: Option<(Instant, Duration)>) -> Option<Duration> {
+    #[cfg(unix)]
+    if TERMINATED.get().is_some_and(|state| {
+        state
+            .as_ref()
+            .is_ok_and(|stopped| stopped.load(Ordering::Relaxed))
+    }) {
+        return Some(Duration::ZERO);
+    }
+    timing.map(|(started, duration)| duration.saturating_sub(started.elapsed()))
+}
+
+fn run_asciiquarium(
+    mut command: Command,
+    timing: Option<(Instant, Duration)>,
+) -> Result<InputAction, String> {
+    command.arg("--hosted");
+    if let Some(duration) = remaining(timing) {
+        if duration.is_zero() {
+            return Ok(InputAction::Exit);
+        }
+        command
+            .arg("--duration-millis")
+            .arg(duration.as_millis().min(u64::MAX as u128).to_string());
+    }
+    let had_terminal = io::stdin().is_terminal();
+    let mut child = AquariumChild(
+        command
+            .spawn()
+            .map_err(|error| format!("could not launch asciiquarium: {error}"))?,
+    );
+    loop {
+        if let Some(status) = child
+            .0
+            .try_wait()
+            .map_err(|error| format!("could not wait for asciiquarium: {error}"))?
+        {
+            // Hosted protocol: navigation is intentional, all other failures remain errors.
+            return match status.code() {
+                Some(0) => Ok(InputAction::Exit),
+                Some(10) => Ok(InputAction::Previous),
+                Some(11) => Ok(InputAction::Next),
+                _ => Err(format!("asciiquarium exited with {status}")),
+            };
+        }
+        let remaining = remaining(timing);
+        if remaining == Some(Duration::ZERO) || (had_terminal && !io::stdin().is_terminal()) {
+            return Ok(InputAction::Exit);
+        }
+        // The child alone reads input. The host enforces the original deadline,
+        // including process startup, and its guards restore the terminal after a kill.
+        std::thread::sleep(
+            remaining
+                .unwrap_or(Duration::MAX)
+                .min(Duration::from_millis(10)),
+        );
+    }
+}
+
+fn run_animations(
+    mut style: ScreenStyle,
+    cell_style: GameOfLifeCellStyle,
+    timing: Option<(Instant, Duration)>,
+) -> Result<(), String> {
+    loop {
+        if remaining(timing) == Some(Duration::ZERO) {
+            return Ok(());
+        }
+        style = match style {
+            ScreenStyle::Asciiquarium => {
+                let command =
+                    Command::new(option_env!("YZS_ASCIQUARIUM_BIN").unwrap_or("asciiquarium-rs"));
+                match run_asciiquarium(command, timing)? {
+                    InputAction::Exit => return Ok(()),
+                    action => browse_style(style, action),
+                }
+            }
+            ScreenStyle::Animation(native) => match run_animation(native, cell_style, timing)? {
+                Some(next) => next,
+                None => return Ok(()),
+            },
+            _ => unreachable!("only animated styles enter the browsing session"),
+        };
     }
 }
 
@@ -349,9 +454,8 @@ fn run_logo(duration: Option<Duration>) -> Result<(), String> {
 fn run_animation(
     mut style: AnimationStyle,
     cell_style: GameOfLifeCellStyle,
-    duration: Option<Duration>,
-) -> Result<(), String> {
-    let timing = duration.map(|duration| (Instant::now(), duration));
+    timing: Option<(Instant, Duration)>,
+) -> Result<Option<ScreenStyle>, String> {
     let mut width = terminal_width();
     let mut height = terminal_height();
     let mut animation = build_animation(style, width, height, cell_style);
@@ -367,8 +471,8 @@ fn run_animation(
     let mut lifetime = card_lifetime();
 
     loop {
-        if timing.is_some_and(|(started, duration)| started.elapsed() >= duration) {
-            return Ok(());
+        if remaining(timing) == Some(Duration::ZERO) {
+            return Ok(None);
         }
 
         // Presentation ticks do not advance the simulation. Cache its last frame
@@ -393,9 +497,13 @@ fn run_animation(
         let action = poll_for_input(delay)?;
         let current = (terminal_width(), terminal_height());
         match action {
-            Some(InputAction::Exit) => return Ok(()),
+            Some(InputAction::Exit) => return Ok(None),
             Some(action @ (InputAction::Previous | InputAction::Next)) => {
-                style = browse_animation(style, action);
+                let next = browse_style(ScreenStyle::Animation(style), action);
+                let ScreenStyle::Animation(native) = next else {
+                    return Ok(Some(next));
+                };
+                style = native;
                 (width, height) = current;
                 animation = build_animation(style, width, height, cell_style);
                 cadence = frame_delay(style);
@@ -606,17 +714,28 @@ fn frame_delay(style: AnimationStyle) -> Duration {
     }
 }
 
-fn browse_animation(style: AnimationStyle, action: InputAction) -> AnimationStyle {
+fn browse_style(style: ScreenStyle, action: InputAction) -> ScreenStyle {
+    let count = ANIMATION_STYLES.len() + 1;
     let offset = match action {
-        InputAction::Previous => ANIMATION_STYLES.len() - 1,
+        InputAction::Previous => count - 1,
         InputAction::Next => 1,
         InputAction::Exit => return style,
     };
-    let index = ANIMATION_STYLES
-        .iter()
-        .position(|candidate| *candidate == style)
-        .expect("native animation style is browsable");
-    ANIMATION_STYLES[(index + offset) % ANIMATION_STYLES.len()]
+    // Aquarium precedes the native cycle without introducing a second style list.
+    let index = match style {
+        ScreenStyle::Asciiquarium => 0,
+        ScreenStyle::Animation(native) => {
+            1 + ANIMATION_STYLES
+                .iter()
+                .position(|candidate| *candidate == native)
+                .expect("native style is browsable")
+        }
+        _ => unreachable!("static and logo do not browse"),
+    };
+    match (index + offset) % count {
+        0 => ScreenStyle::Asciiquarium,
+        index => ScreenStyle::Animation(ANIMATION_STYLES[index - 1]),
+    }
 }
 
 fn key_action(key: KeyEvent) -> Option<InputAction> {
@@ -999,7 +1118,7 @@ mod tests {
     }
 
     #[test]
-    fn native_animation_navigation_maps_keys_and_wraps_in_canonical_order() {
+    fn animation_navigation_maps_keys_and_wraps_through_aquarium() {
         let action = |code| key_action(KeyEvent::new(code, KeyModifiers::NONE));
         for code in [KeyCode::Left, KeyCode::Char('h'), KeyCode::Char('p')] {
             assert_eq!(action(code), Some(InputAction::Previous));
@@ -1039,15 +1158,112 @@ mod tests {
                 AnimationStyle::GameOfLife(GAME_OF_LIFE_RANDOM_STYLES[1]),
             ]
         );
-        for index in 0..ANIMATION_STYLES.len() {
-            let current = ANIMATION_STYLES[index];
+        let cycle: Vec<_> = std::iter::once(ScreenStyle::Asciiquarium)
+            .chain(ANIMATION_STYLES.iter().copied().map(ScreenStyle::Animation))
+            .collect();
+        for index in 0..cycle.len() {
+            let current = cycle[index];
             assert_eq!(
-                browse_animation(current, InputAction::Next),
-                ANIMATION_STYLES[(index + 1) % ANIMATION_STYLES.len()]
+                browse_style(current, InputAction::Next),
+                cycle[(index + 1) % cycle.len()]
             );
             assert_eq!(
-                browse_animation(current, InputAction::Previous),
-                ANIMATION_STYLES[(index + ANIMATION_STYLES.len() - 1) % ANIMATION_STYLES.len()]
+                browse_style(current, InputAction::Previous),
+                cycle[(index + cycle.len() - 1) % cycle.len()]
+            );
+            assert_eq!(browse_style(current, InputAction::Exit), current);
+        }
+    }
+
+    // Defends the executable boundary, including a child that ignores its timer.
+    #[cfg(unix)]
+    #[test]
+    fn aquarium_outcomes_deadline_and_reaping() {
+        use std::process::Stdio;
+        let fake = |script: &str| {
+            let mut command = Command::new("sh");
+            command.args(["-c", script, "fake-aquarium"]);
+            command
+        };
+        for (status, action) in [
+            (0, InputAction::Exit),
+            (10, InputAction::Previous),
+            (11, InputAction::Next),
+        ] {
+            assert_eq!(
+                run_asciiquarium(fake(&format!("exit {status}")), None).unwrap(),
+                action
+            );
+        }
+        assert!(
+            run_asciiquarium(fake("exit 2"), None)
+                .unwrap_err()
+                .contains("exited with")
+        );
+        let missing = || Command::new("/nonexistent/anima-test-aquarium");
+        assert!(
+            run_asciiquarium(missing(), None)
+                .unwrap_err()
+                .contains("could not launch")
+        );
+        assert_eq!(
+            run_asciiquarium(missing(), Some((Instant::now(), Duration::ZERO))).unwrap(),
+            InputAction::Exit
+        );
+        assert_eq!(run_asciiquarium(fake(
+            r#"test "$1" = --hosted && test "$2" = --duration-millis && test "$3" -gt 0 && test "$3" -le 350 || exit 2; exit 11"#
+        ), Some((Instant::now(), Duration::from_millis(350)))).unwrap(), InputAction::Next);
+
+        let marker = std::env::temp_dir().join(format!("anima-child-{}", std::process::id()));
+        let terminate = std::env::var_os("ANIMA_TEST_TERMINATE").is_some();
+        if terminate {
+            install_termination_handlers().unwrap();
+        }
+        let mut command = fake(if terminate {
+            r#"printf '%s' "$$"; kill -TERM "$PPID"; exec sleep 2"#
+        } else {
+            r#"printf '%s' "$$"; exec sleep 30"#
+        });
+        command.stdout(std::fs::File::create_new(&marker).unwrap());
+        let started = Instant::now();
+        assert_eq!(
+            run_asciiquarium(
+                command,
+                (!terminate).then_some((started, Duration::from_millis(250)))
+            )
+            .unwrap(),
+            InputAction::Exit
+        );
+        assert!(started.elapsed() < Duration::from_secs(2));
+        let pid = std::fs::read_to_string(&marker).unwrap();
+        std::fs::remove_file(marker).unwrap();
+        assert!(!pid.is_empty());
+        assert!(
+            !Command::new("kill")
+                .args(["-0", &pid])
+                .stderr(Stdio::null())
+                .status()
+                .unwrap()
+                .success(),
+            "child was not reaped"
+        );
+        if !terminate {
+            // Isolate the real termination signal from the parallel test harness.
+            let mut command = fake(
+                r#"exec "$ANIMA_TEST_EXE" --exact screen_runner::tests::aquarium_outcomes_deadline_and_reaping"#,
+            );
+            command
+                .env("ANIMA_TEST_EXE", std::env::current_exe().unwrap())
+                .env("ANIMA_TEST_TERMINATE", "1")
+                .stdout(Stdio::null());
+            let started = Instant::now();
+            assert_eq!(
+                run_asciiquarium(command, Some((started, Duration::from_secs(2)))).unwrap(),
+                InputAction::Exit
+            );
+            assert!(
+                started.elapsed() < Duration::from_secs(1),
+                "termination was not handled"
             );
         }
     }

@@ -132,10 +132,11 @@ The [gallery](#animation-gallery) shows every distinct animation. `boids` is an
 alias of `boids_predator`. `static` shows a still welcome card; `random` chooses
 an animation. No style means `random`
 
-In native animations, `Left`/`h`/`p` selects the previous style and
-`Right`/`l`/`n` selects the next; any other key exits
+In animations, including Aquarium, `Left`/`h`/`p` selects the previous style and
+`Right`/`l`/`n` selects the next; any other key exits. Aquarium precedes Boids:
+Predator in the wrapping cycle. Switching preserves the original session timer
 
-A top-left card shows the animation name, the original creator's role and
+A top-left card in native animations shows the name, the original creator's role and
 credit, and `←/h previous · l/→ next` on startup and after switching styles.
 Its text and border fade in for one second, hold for two, then fade out for
 one. Short timed sessions scale that sequence to the remaining time;
@@ -173,15 +174,19 @@ plus rendering and terminal I/O time). Spatial phases are cached on resize;
 frame updates use a fixed amount of work per pixel and add no dependency
 
 The aquarium runs as a separate
-[`asciiquarium-rs`](https://github.com/cablehead/asciiquarium-rs) process under
+[`Yazelix/asciiquarium-rs`](https://github.com/Yazelix/asciiquarium-rs) process under
 its GPL-2.0-or-later license. Its upstream [credit and
 lineage](https://github.com/cablehead/asciiquarium-rs#credit-and-lineage) section
 traces it to Kirk Baucom's original Perl program, Joan Stark's ASCII art,
-Claudio Matsuoka's additions, and `cablehead`'s Rust port. `anima` supplies the same
-any-key exit and optional duration contract used by its native styles without
-copying or linking the aquarium implementation. The packaged upstream revision
-exits cleanly when its terminal disappears, so closing the containing terminal
-cannot orphan it
+Claudio Matsuoka's additions, and `cablehead`'s Rust port. The fork adds a
+[hosted navigation contract](https://github.com/Yazelix/asciiquarium-rs#yazelix-fork)
+without changing the art or linking Aquarium into Anima. Anima owns one terminal
+session and deadline; Aquarium owns input and drawing while active. Anima reaps
+the child on navigation, exit, terminal loss, or deadline expiry. On Unix, the
+CLI handles termination signals through the existing `signal-hook` dependency
+so its guards can restore the terminal. Standalone Aquarium controls remain
+unchanged. Cargo-only Anima installs require this fork's executable on `PATH`;
+Nix packages pin it without relying on `PATH`
 
 ## Animation Gallery
 
