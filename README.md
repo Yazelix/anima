@@ -159,8 +159,10 @@ remain explicitly selectable but outside that pool. The library random helper
 includes all native animation families with equal family weighting.
 
 In `aquarium`, small schools and striped reef fish swim past swaying kelp,
-coral, rocks, and rising bubbles. A ray crosses larger tanks and a sand crab
-walks the open channel. The scene starts populated, uses square truecolor
+coral, rocks, and rising bubbles. A ray, a slow whale, and a faster shark take
+turns crossing larger tanks; a sand crab walks the open channel. Whale and shark
+arrive later in the 48-second scene cycle and are omitted in tanks too small for
+their silhouettes. The scene starts populated, uses square truecolor
 half-block pixels, and caps fish at 36, bubbles at 64, and plant stems at 32.
 It shares native browsing, the fading card, and the original welcome timer.
 Frame producers use no terminal or subprocess APIs. Aquarium has one browse
@@ -214,7 +216,7 @@ Run the command above a GIF to watch that style in your terminal.
 
 `anima aquarium`
 
-![Pixel-art reef fish and a ray swimming above kelp, coral, and a sand crab](assets/animations/aquarium.gif)
+![A pixel-art whale passing reef fish, kelp, coral, and a sand crab](assets/animations/aquarium.gif)
 
 ### Boids: Predator
 

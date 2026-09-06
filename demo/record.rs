@@ -22,10 +22,10 @@ fn record(r: &mut Recorder) -> Result<()> {
     let recordings = demo.join(".work");
     fs::create_dir_all(&gallery)?;
     fs::create_dir_all(&recordings)?;
-    // Warm-up seconds: trail networks need longer to develop than the other styles.
+    // Warm-up seconds: allow trails to develop and the Aquarium whale to arrive.
     let styles = [
         ("logo", 4),
-        ("aquarium", 4),
+        ("aquarium", 23),
         ("boids_predator", 4),
         ("boids_schools", 4),
         ("friends_and_enemies", 4),

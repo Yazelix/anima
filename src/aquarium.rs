@@ -26,8 +26,35 @@ const ANGEL: &[&[u8]] = &[
     b"    f    ",
     b"    f    ",
 ];
+const WHALE: &[&[u8]] = &[
+    b"             hhhhhhhhhhhhh       ",
+    b"          hhhbbbbbbbbbbbbbhhh    ",
+    b"ff      hhbbbbbbbbbbbbbbbbbbbhh  ",
+    b" ffb  hhbbbbbbbbbbbbbbbbbbbbbbbh ",
+    b"  fbbbbbbbbbbbbbbbbbbbbbbbbebbbbh",
+    b" ffb  bbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    b"ff     bbbbbbbbbbbbbbbssssssssssb",
+    b"        sssbbbbbbbbsssssssssssss ",
+    b"           sssbbbbbsssssssssss   ",
+    b"              ffbbbsssss         ",
+    b"               fffbb             ",
+    b"                 ff              ",
+];
+const SHARK: &[&[u8]] = &[
+    b"             b                 ",
+    b"            bb                 ",
+    b"f          bbb                 ",
+    b"fb       hhbbbhhhhhhh          ",
+    b" fbb  hhhbbbbbbbbbsbbbhhh      ",
+    b"  fbbbbbbbbbbbbbsbsbbbebbhhhh  ",
+    b" fbb  sbbbbbbbbbsbsbbbbbbbbbbbh",
+    b"fb     ssssssssssssssssss      ",
+    b"f           ffbbss             ",
+    b"              ffb              ",
+    b"                f              ",
+];
 // Body, highlight, stripe, fin. A fixed palette also bounds terminal style caches.
-const FISH_COLORS: [[[u8; 3]; 4]; 4] = [
+const FISH_COLORS: [[[u8; 3]; 4]; 6] = [
     [
         [232, 137, 66],
         [255, 211, 134],
@@ -52,6 +79,18 @@ const FISH_COLORS: [[[u8; 3]; 4]; 4] = [
         [97, 71, 131],
         [144, 83, 154],
     ],
+    [
+        [83, 134, 164],
+        [143, 190, 207],
+        [112, 163, 180],
+        [53, 100, 135],
+    ],
+    [
+        [103, 140, 152],
+        [151, 182, 186],
+        [64, 102, 115],
+        [72, 112, 129],
+    ],
 ];
 
 #[derive(Clone, Copy)]
@@ -59,6 +98,8 @@ enum FishKind {
     Minnow,
     Reef,
     Angel,
+    Whale,
+    Shark,
 }
 
 impl FishKind {
@@ -67,6 +108,8 @@ impl FishKind {
             Self::Minnow => MINNOW,
             Self::Reef => REEF,
             Self::Angel => ANGEL,
+            Self::Whale => WHALE,
+            Self::Shark => SHARK,
         }
     }
 }
@@ -145,7 +188,7 @@ impl AquariumAnimation {
                     } else {
                         FishKind::Reef
                     },
-                    color: if school { 1 } else { i % FISH_COLORS.len() },
+                    color: if school { 1 } else { i % 4 },
                     depth: if school { 0 } else { 1 + i % 2 },
                 }
             })
@@ -228,10 +271,13 @@ impl AquariumAnimation {
         for plant in self.plants.iter().filter(|plant| !plant.front) {
             paint_plant(field, plant, height, self.phase);
         }
-        // A ray crosses the distant open water, then spends the rest of its loop offscreen.
-        if width >= 60 && height >= 30 {
-            let x = ((self.phase / TAU + 0.15) % 1.0) * (width as f64 * 3.0 + 70.0) - 45.0;
+        // Large visitors take separate turns, leaving quiet intervals between crossings.
+        if width >= 60 && height >= 30 && self.phase / TAU < 0.25 {
+            let x = -9.0 + (width as f64 + 33.0) * self.phase / TAU / 0.25;
             paint_ray(field, x as i32, (height as f64 * 0.43) as i32, self.phase);
+        }
+        if let Some(fish) = visitor(width, height, self.phase) {
+            paint_fish(field, &fish, self.phase);
         }
         for bubble in &self.bubbles {
             let x = (bubble.x + (self.phase * 5.0 + bubble.y * 0.22).sin()) as i32;
@@ -332,6 +378,34 @@ impl ScreenFrameProducer for AquariumAnimation {
 
 pub fn aquarium_frame_delay() -> Duration {
     Duration::from_millis(40)
+}
+
+fn visitor(width: usize, height: usize, phase: f64) -> Option<Fish> {
+    let t = phase / TAU;
+    let (kind, color, progress, speed) = if width >= 80 && height >= 40 && (0.32..0.70).contains(&t)
+    {
+        (FishKind::Whale, 4, (t - 0.32) / 0.38, 1.0)
+    } else if width >= 60 && height >= 30 && (0.80..0.96).contains(&t) {
+        (FishKind::Shark, 5, (t - 0.80) / 0.16, -1.0)
+    } else {
+        return None;
+    };
+    // Include the entire silhouette, not the ordinary fish's fixed wrapping margin.
+    let margin = (kind.art()[0].len() / 2 + 1) as f64;
+    let progress = if speed < 0.0 {
+        1.0 - progress
+    } else {
+        progress
+    };
+    Some(Fish {
+        x: -margin + progress * (width as f64 + 2.0 * margin),
+        y: height as f64 * 0.36,
+        speed,
+        phase: 0.0,
+        kind,
+        color,
+        depth: 1,
+    })
 }
 
 fn pixel(field: &mut HalfBlockField, x: i32, y: i32, color: [u8; 3]) {
@@ -612,6 +686,73 @@ mod tests {
                     .expect("visible minnow eye");
                 for (x, y) in [(x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)] {
                     assert!(at(&right, x, y).is_some_and(|color| Some(color) != eye));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn visitors_recur_without_crowding_or_teleporting_and_keep_readable_heads() {
+        for (width, height) in [(0, 0), (1, 2), (40, 24), (60, 30), (80, 40), (200, 120)] {
+            let mut field = HalfBlockField::new(width, height);
+            let mut visible = [0; 2];
+            let mut previous = [0; 2];
+            for frame in 0..=2_400 {
+                let phase = (frame % 1_200) as f64 * TAU / 1_200.0;
+                field.clear();
+                let mut counts = [0; 2];
+                if let Some(fish) = visitor(width, height, phase) {
+                    assert!(phase / TAU >= 0.25, "ray must finish first");
+                    assert!(fish.x.is_finite() && fish.y.is_finite());
+                    let index = fish.color - 4;
+                    paint_fish(&mut field, &fish, phase);
+                    counts[index] = field.cells.iter().flatten().filter(|p| p.is_some()).count();
+                    visible[index] += usize::from(counts[index] > 0);
+                }
+                for i in 0..2 {
+                    if counts[i] == 0 || previous[i] == 0 {
+                        assert!(
+                            counts[i].max(previous[i]) <= 24,
+                            "full sprite popped at edge"
+                        );
+                    }
+                }
+                previous = counts;
+            }
+            assert_eq!(visible[0] > 0, width >= 80 && height >= 40);
+            assert_eq!(visible[1] > 0, width >= 60 && height >= 30);
+            if visible[0] > 0 {
+                assert!(visible[0] > visible[1] * 2, "whale crossing must be slower");
+            }
+        }
+        for (kind, color) in [(FishKind::Whale, 4), (FishKind::Shark, 5)] {
+            let art = kind.art();
+            assert!(art.iter().all(|row| row.len() == art[0].len()));
+            for speed in [-1.0, 1.0] {
+                for phase in [0.0, TAU * 0.75 / 28.0] {
+                    let mut field = HalfBlockField::new(80, 48);
+                    paint_fish(
+                        &mut field,
+                        &Fish {
+                            x: 40.0,
+                            y: 24.0,
+                            speed,
+                            phase: 0.0,
+                            kind,
+                            color,
+                            depth: 1,
+                        },
+                        phase,
+                    );
+                    let at = |x: usize, y: usize| field.cells[(y / 2) * 80 + x][y % 2];
+                    let eye = Some(RgbColor::new(13, 28, 37));
+                    let (x, y) = (1..47)
+                        .flat_map(|y| (1..79).map(move |x| (x, y)))
+                        .find(|&(x, y)| at(x, y) == eye)
+                        .expect("visible visitor eye");
+                    for (x, y) in [(x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)] {
+                        assert!(at(x, y).is_some_and(|color| Some(color) != eye));
+                    }
                 }
             }
         }
