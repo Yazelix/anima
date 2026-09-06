@@ -19,4 +19,9 @@ path = "src/bin/anima.rs"
 crossterm = "0.29"
 
 [target.'cfg(unix)'.dependencies]
+# The default Mio backend loops indefinitely on a closed PTY (Crossterm 0.29).
+crossterm = { version = "0.29", features = ["use-dev-tty"] }
 signal-hook = { version = "0.3", default-features = false }
+
+[target.'cfg(unix)'.dev-dependencies]
+libc = "0.2"

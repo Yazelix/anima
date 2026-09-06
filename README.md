@@ -155,6 +155,10 @@ if the complete text cannot fit. Static, logo, and the separate aquarium
 process do not use this card. Library frame producers return animation-only
 frames
 
+Native playback replaces rows without first clearing the entire screen. Each
+frame and identity card share one synchronized update. On Unix, playback exits
+when its input terminal closes, including closures that send no signal.
+
 Random chooses from all current native animations and Aquarium, including
 `friends_and_enemies`, `physarum`, `chladni`, and `plasma`. `static` and `logo`
 remain explicitly selectable but outside that pool. The library random helper

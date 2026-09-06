@@ -762,10 +762,22 @@ fn key_action(key: KeyEvent) -> Option<InputAction> {
 fn poll_for_input(timeout: Duration) -> Result<Option<InputAction>, String> {
     let started = Instant::now();
     let mut wait = timeout;
+    let had_terminal = io::stdin().is_terminal();
+    let poll_interval = Duration::from_millis(50);
 
     loop {
-        if !event::poll(wait).map_err(|error| format!("could not poll terminal input: {error}"))? {
-            return Ok(None);
+        // Long static/logo waits must still notice terminal loss and shutdown.
+        let ready = event::poll(wait.min(poll_interval))
+            .map_err(|error| format!("could not poll terminal input: {error}"))?;
+        if remaining(None) == Some(Duration::ZERO) || (had_terminal && !io::stdin().is_terminal()) {
+            return Ok(Some(InputAction::Exit));
+        }
+        if !ready {
+            if wait <= poll_interval {
+                return Ok(None);
+            }
+            wait = timeout.saturating_sub(started.elapsed());
+            continue;
         }
         let key = event::read()
             .map_err(|error| format!("could not read terminal input: {error}"))?

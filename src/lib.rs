@@ -347,6 +347,12 @@ mod tests {
         assert_eq!(output.matches(RESET).count(), frame.len() + 1);
         assert!(terminal_control::clear_screen_sequence().starts_with(RESET));
         assert!(!output.contains('\n'));
+        // A terminal may present an incomplete write despite synchronized output.
+        // Redrawing a row must not first erase the rest of the previous frame.
+        assert!(!output.contains("\x1b[2J"));
+        assert!(output.contains("\x1b[1;1H\x1b[2K"));
+        assert!(output.contains("\x1b[3;1H\x1b[Jc"));
+        assert!(screen_frame_output(&[]).contains("\x1b[2J"));
         assert!(output.contains(&frame[0]));
         assert!(output.contains(&frame[1]));
 

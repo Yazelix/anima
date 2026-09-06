@@ -79,13 +79,23 @@ pub(crate) fn write_truecolor(
 }
 
 pub(crate) fn screen_frame_output(frame: &[String]) -> String {
+    if frame.is_empty() {
+        return clear_screen_sequence();
+    }
     command_string(|output| {
-        queue!(output, ResetColor, MoveTo(0, 0), Clear(ClearType::All))?;
+        queue!(output, ResetColor)?;
         for (row_index, line) in frame.iter().enumerate() {
+            // Keep the old lower rows visible until their replacements arrive.
+            // Only the last row erases any leftover rows from a taller frame.
+            let clear = if row_index == frame.len() - 1 {
+                ClearType::FromCursorDown
+            } else {
+                ClearType::CurrentLine
+            };
             queue!(
                 output,
                 MoveTo(0, row_index.min(u16::MAX as usize) as u16),
-                Clear(ClearType::CurrentLine),
+                Clear(clear),
                 Print(line),
                 ResetColor
             )?;
