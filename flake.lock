@@ -1,22 +1,5 @@
 {
   "nodes": {
-    "asciiquarium": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1788644100,
-        "narHash": "sha256-+YTR7rJKiBYo7lFFgXsucrDHs6YuJNlBcS2zTMKH558=",
-        "owner": "Yazelix",
-        "repo": "asciiquarium-rs",
-        "rev": "26e06268d24cd6c31b5d2b88d0eea2ed565f73a1",
-        "type": "github"
-      },
-      "original": {
-        "owner": "Yazelix",
-        "repo": "asciiquarium-rs",
-        "rev": "26e06268d24cd6c31b5d2b88d0eea2ed565f73a1",
-        "type": "github"
-      }
-    },
     "fenix": {
       "inputs": {
         "nixpkgs": [
@@ -161,7 +144,6 @@
     },
     "root": {
       "inputs": {
-        "asciiquarium": "asciiquarium",
         "fenix": "fenix",
         "kinestra": "kinestra",
         "nixpkgs": "nixpkgs_2",

@@ -25,7 +25,6 @@ fn record(r: &mut Recorder) -> Result<()> {
     // Warm-up seconds: trail networks need longer to develop than the other styles.
     let styles = [
         ("logo", 4),
-        ("asciiquarium", 4),
         ("aquarium", 4),
         ("boids_predator", 4),
         ("boids_schools", 4),

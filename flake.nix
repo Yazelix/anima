@@ -6,10 +6,6 @@
     recording-mars.url = "github:Yazelix/mars/21109e3ebc24b63da11bae644dfb9bab28ce0e18";
     recording-mars.inputs.nixpkgs.url = "github:NixOS/nixpkgs/567a49d1913ce81ac6e9582e3553dd90a955875f";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    asciiquarium = {
-      url = "github:Yazelix/asciiquarium-rs/26e06268d24cd6c31b5d2b88d0eea2ed565f73a1";
-      flake = false;
-    };
     fenix = {
       url = "github:nix-community/fenix";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -20,7 +16,6 @@
     {
       self,
       nixpkgs,
-      asciiquarium,
       fenix,
       kinestra,
       recording-mars,
@@ -52,24 +47,6 @@
                 }
               );
           };
-          aquarium = pkgs.rustPlatform.buildRustPackage {
-            pname = "asciiquarium-rs";
-            version = "0.1.1-dev";
-            src = asciiquarium;
-            cargoDeps = importCargoLock { lockFile = "${asciiquarium}/Cargo.lock"; };
-
-            postInstall = ''
-              install -Dm644 LICENSE "$out/share/doc/asciiquarium-rs/LICENSE"
-              install -Dm644 README.md "$out/share/doc/asciiquarium-rs/README.md"
-            '';
-
-            meta = {
-              description = "Aquarium animation in ASCII art";
-              homepage = "https://github.com/Yazelix/asciiquarium-rs";
-              license = pkgs.lib.licenses.gpl2Plus;
-              mainProgram = "asciiquarium-rs";
-            };
-          };
           rustToolchain = fenix.packages.${system}.combine [
             fenix.packages.${system}.stable.cargo
             fenix.packages.${system}.stable.rustc
@@ -99,8 +76,6 @@
             "--bin"
             "anima"
           ];
-          YZS_ASCIQUARIUM_BIN = "${aquarium}/bin/asciiquarium-rs";
-
           doCheck = false;
 
           meta = {

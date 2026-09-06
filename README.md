@@ -14,7 +14,6 @@ the default Nix entry points select the same executable.
 nix run github:Yazelix/anima#anima
 nix run github:Yazelix/anima#anima -- static
 nix run github:Yazelix/anima#anima -- aquarium --duration-seconds 3
-nix run github:Yazelix/anima#anima -- asciiquarium --duration-seconds 3
 nix run github:Yazelix/anima#anima -- mandelbrot
 nix run github:Yazelix/anima#anima -- friends_and_enemies
 nix run github:Yazelix/anima#anima -- primordial
@@ -28,7 +27,6 @@ nix run github:Yazelix/anima#anima -- random --duration-seconds 3
 ## What It Contains
 
 - Native animation engines for Aquarium, Boids, friends and enemies, Primordial Particle Systems, Physarum trail networks, Chladni nodal patterns, Plasma interference, Mandelbrot, Matrix rain, and Game of Life
-- The separately packaged `asciiquarium-rs` terminal aquarium
 - Static and logo-style Yazelix welcome screens
 - File-backed Kitty PNG frame sequence rendering
 - Frame production through `ScreenFrameProducer`
@@ -75,7 +73,6 @@ anima --help
 anima
 anima static
 anima aquarium --duration-seconds 3
-anima asciiquarium --duration-seconds 3
 anima friends_and_enemies --duration-seconds 3
 anima primordial --duration-seconds 3
 anima physarum --duration-seconds 3
@@ -102,7 +99,6 @@ From this repository:
 cargo run --bin anima -- --help
 cargo run --bin anima -- static
 cargo run --bin anima -- aquarium --duration-seconds 3
-cargo run --bin anima -- asciiquarium --duration-seconds 3
 cargo run --bin anima -- friends_and_enemies --duration-seconds 3
 cargo run --bin anima -- primordial --duration-seconds 3
 cargo run --bin anima -- physarum --duration-seconds 3
@@ -113,9 +109,9 @@ cargo run --bin anima -- game_of_life_tumblers --cell-style dotted
 cargo run --bin anima -- random --duration-seconds 3
 ```
 
-The native `aquarium` needs no external executable. For classic `asciiquarium`,
-source-only Cargo runs resolve the hosted fork from `PATH`; Nix runs use the
-pinned fork executable.
+`aquarium` needs no external executable. `asciiquarium` is a compatibility alias
+for the same native scene, including in existing Nova welcome configurations.
+The alias displays Anima's pixel art, not the classic ASCII renderer.
 
 With Nix:
 
@@ -124,7 +120,6 @@ nix build .#anima
 nix run .#anima -- --help
 nix run .#anima -- static
 nix run .#anima -- aquarium --duration-seconds 3
-nix run .#anima -- asciiquarium --duration-seconds 3
 nix run .#anima -- friends_and_enemies --duration-seconds 3
 nix run .#anima -- primordial --duration-seconds 3
 nix run .#anima -- physarum --duration-seconds 3
@@ -139,8 +134,8 @@ alias of `boids_predator`. `static` shows a still welcome card; `random` chooses
 an animation. No style means `random`
 
 In animations, including Aquarium, `Left`/`h`/`p` selects the previous style and
-`Right`/`l`/`n` selects the next; any other key exits. Classic Asciiquarium,
-native Aquarium, then Boids: Predator begin the wrapping cycle. Switching
+`Right`/`l`/`n` selects the next; any other key exits. Aquarium, then
+Boids: Predator begin the wrapping cycle. Switching
 preserves the original session timer.
 
 A top-left card in native animations shows the name, the original creator's role and
@@ -151,28 +146,25 @@ switching does not extend the session. The RGB fade uses an opaque black
 backing inside the border for contrast; border cells use the terminal's normal
 background so the fill does not extend outside the rounded outline.
 Credits wrap in narrow terminals; the card stays hidden
-if the complete text cannot fit. Static, logo, and the separate aquarium
-process do not use this card. Library frame producers return animation-only
-frames
+if the complete text cannot fit. Static and logo do not use this card.
+Library frame producers return animation-only frames
 
 Native playback replaces rows without first clearing the entire screen. Each
 frame and identity card share one synchronized update. On Unix, playback exits
 when its input terminal closes, including closures that send no signal.
 
-Random chooses from all current native animations and Aquarium, including
+Random chooses from all current native animations, including Aquarium,
 `friends_and_enemies`, `physarum`, `chladni`, and `plasma`. `static` and `logo`
 remain explicitly selectable but outside that pool. The library random helper
-includes all native animation families with equal family weighting; it does
-not launch the external Aquarium process
+includes all native animation families with equal family weighting.
 
 In `aquarium`, small schools and striped reef fish swim past swaying kelp,
 coral, rocks, and rising bubbles. A ray crosses larger tanks and a sand crab
 walks the open channel. The scene starts populated, uses square truecolor
 half-block pixels, and caps fish at 36, bubbles at 64, and plant stems at 32.
 It shares native browsing, the fading card, and the original welcome timer.
-Frame producers use no terminal or subprocess APIs. Both `aquarium` and classic
-`asciiquarium` remain selectable and each has one CLI random slot; the library
-random helper includes only the native Aquarium family.
+Frame producers use no terminal or subprocess APIs. Aquarium has one browse
+entry and one CLI random slot; its compatibility alias adds no extra weight.
 
 Anima's Aquarium code, pixel silhouettes, palette, and scene motion are original
 work in [src/aquarium.rs](src/aquarium.rs), under Anima's Apache-2.0 license.
@@ -200,20 +192,12 @@ terminal-cell convention and a 1,200-frame loop (48 seconds of frame delays,
 plus rendering and terminal I/O time). Spatial phases are cached on resize;
 frame updates use a fixed amount of work per pixel and add no dependency
 
-Classic `asciiquarium` runs as a separate
-[`Yazelix/asciiquarium-rs`](https://github.com/Yazelix/asciiquarium-rs) process under
-its GPL-2.0-or-later license. Its upstream [credit and
-lineage](https://github.com/cablehead/asciiquarium-rs#credit-and-lineage) section
-traces it to Kirk Baucom's original Perl program, Joan Stark's ASCII art,
-Claudio Matsuoka's additions, and `cablehead`'s Rust port. The fork adds a
-[hosted navigation contract](https://github.com/Yazelix/asciiquarium-rs#yazelix-fork)
-without changing the art or linking Aquarium into Anima. Anima owns one terminal
-session and deadline; Aquarium owns input and drawing while active. Anima reaps
-the child on navigation, exit, terminal loss, or deadline expiry. On Unix, the
-CLI handles termination signals through the existing `signal-hook` dependency
-so its guards can restore the terminal. Standalone Aquarium controls remain
-unchanged. Cargo-only Anima installs require this fork's executable on `PATH`;
-Nix packages pin it without relying on `PATH`
+For the classic ASCII scene, see the separate
+[`Yazelix/asciiquarium-rs`](https://github.com/Yazelix/asciiquarium-rs) project.
+Its [credit and lineage](https://github.com/cablehead/asciiquarium-rs#credit-and-lineage)
+honors Kirk Baucom's original Perl program, Joan Stark's ASCII art,
+Claudio Matsuoka's additions, and `cablehead`'s Rust port. Anima retains these
+historical credits but does not bundle the classic executable or its artwork.
 
 ## Animation Gallery
 
@@ -231,12 +215,6 @@ Run the command above a GIF to watch that style in your terminal.
 `anima aquarium`
 
 ![Pixel-art reef fish and a ray swimming above kelp, coral, and a sand crab](assets/animations/aquarium.gif)
-
-### Classic Asciiquarium
-
-`anima asciiquarium`
-
-![ASCII fish swimming past seaweed and rising bubbles](assets/animations/asciiquarium.gif)
 
 ### Boids: Predator
 

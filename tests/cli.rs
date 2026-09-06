@@ -54,7 +54,13 @@ fn closing_the_terminal_exits_timed_and_interactive_playback() {
         }
     }
 
-    for style in ["aquarium", "boids_predator", "static", "logo"] {
+    for style in [
+        "aquarium",
+        "asciiquarium",
+        "boids_predator",
+        "static",
+        "logo",
+    ] {
         for timed in [false, true] {
             for controlling in [false, true] {
                 let (mut master, mut slave) = (-1, -1);
