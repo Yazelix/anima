@@ -6,7 +6,7 @@ use crate::{HalfBlockField, RgbColor, ScreenAnimationContext, ScreenFrameProduce
 pub const AQUARIUM_STYLE: &str = "aquarium";
 
 // Original pixel silhouettes and palette, drawn for Anima. No external sprites.
-const MINNOW: &[&[u8]] = &[b"  hh ", b"fbbbe", b"  ss "];
+const MINNOW: &[&[u8]] = &[b"f hhh ", b" fbbeb", b"f sss "];
 const REEF: &[&[u8]] = &[
     b"     ff     ",
     b"   hhbbssb  ",
@@ -594,6 +594,26 @@ mod tests {
         assert!(right.cells.iter().flatten().any(Option::is_some));
         for y in 0..48 {
             assert!((3..80).all(|x| at(&right, x, y).is_none()));
+        }
+
+        // The tiny background fish need a head around the eye, even with fins tucked.
+        for speed in [-0.1, 0.1] {
+            for phase in [0.0, TAU * 0.75 / 28.0] {
+                right.clear();
+                let minnow = Fish {
+                    kind: FishKind::Minnow,
+                    ..fish(40.0, speed, 0, 1)
+                };
+                paint_fish(&mut right, &minnow, phase);
+                let eye = Some(RgbColor::new(8, 18, 24));
+                let (x, y) = (1..47)
+                    .flat_map(|y| (1..79).map(move |x| (x, y)))
+                    .find(|&(x, y)| at(&right, x, y) == eye)
+                    .expect("visible minnow eye");
+                for (x, y) in [(x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)] {
+                    assert!(at(&right, x, y).is_some_and(|color| Some(color) != eye));
+                }
+            }
         }
     }
 }
