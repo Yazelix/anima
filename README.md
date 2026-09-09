@@ -1,6 +1,9 @@
 # Anima
 
-Anima is a standalone terminal animation toolkit from Yazelix. It works in any
+*Your terminal, alive.*
+
+Anima is a standalone animation toolkit from Yazelix, bringing life to your terminal
+with generative art and artificial-life simulations. It works in any
 capable terminal; no Yazelix installation is required.
 
 ![Primordial particles, a Mandelbrot dive, Matrix rain, and Game of Life tumblers in Anima](assets/anima.gif)
