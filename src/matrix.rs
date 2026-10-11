@@ -48,6 +48,7 @@ pub struct MatrixAnimation {
     variant: MatrixVariant,
     symbols: bool,
     big: bool,
+    bold: bool,
     frame_index: usize,
     seed: u64,
     columns: Vec<MatrixColumn>,
@@ -59,7 +60,7 @@ impl MatrixAnimation {
     }
 
     pub fn with_variant(context: ScreenAnimationContext, variant: MatrixVariant) -> Self {
-        Self::configured(context, variant, false, false)
+        Self::configured(context, variant, false, false, false)
     }
 
     fn configured(
@@ -67,6 +68,7 @@ impl MatrixAnimation {
         variant: MatrixVariant,
         symbols: bool,
         big: bool,
+        bold: bool,
     ) -> Self {
         let (width, height) = variant.dimensions(context, big);
         let pitch = if big { BIG_GLYPH_HEIGHT } else { 1 };
@@ -79,6 +81,7 @@ impl MatrixAnimation {
             variant,
             symbols,
             big,
+            bold,
             frame_index: 0,
             seed,
             columns,
@@ -95,7 +98,13 @@ impl MatrixAnimation {
         if self.big == big || self.variant == MatrixVariant::Classic {
             return self;
         }
-        Self::configured(self.context, self.variant, self.symbols, big)
+        Self::configured(self.context, self.variant, self.symbols, big, self.bold)
+    }
+
+    /// Request terminal bold weight for Accelerando at either size.
+    pub fn with_bold(mut self, bold: bool) -> Self {
+        self.bold = bold;
+        self
     }
 
     fn render_accelerando(&self) -> Vec<String> {
@@ -140,7 +149,13 @@ impl MatrixAnimation {
                 );
             }
         }
-        frame.render_lines(self.context.resolved_width, colorize_matrix_cell)
+        let mut lines = frame.render_lines(self.context.resolved_width, colorize_matrix_cell);
+        if self.bold {
+            for line in &mut lines {
+                *line = format!("\x1b[1m{line}\x1b[22m");
+            }
+        }
+        lines
     }
 }
 
@@ -192,7 +207,7 @@ impl ScreenFrameProducer for MatrixAnimation {
     }
 
     fn resize(&mut self, context: ScreenAnimationContext) {
-        *self = Self::configured(context, self.variant, self.symbols, self.big);
+        *self = Self::configured(context, self.variant, self.symbols, self.big, self.bold);
     }
 }
 
@@ -533,6 +548,54 @@ mod tests {
         first.frame_index = usize::MAX;
         first.advance_frame();
         assert_eq!(first.frame_index, 0);
+    }
+
+    #[test]
+    fn accelerando_bold_preserves_geometry_options_and_resets_each_row() {
+        for big in [false, true] {
+            for symbols in [false, true] {
+                let plain =
+                    MatrixAnimation::with_variant(context(80, 24), MatrixVariant::Accelerando)
+                        .with_big(big)
+                        .with_symbols(symbols);
+                let mut bold = plain.clone().with_bold(true);
+                let check = |bold: &MatrixAnimation, plain: &MatrixAnimation| {
+                    let frame = bold.render_frame();
+                    assert!(
+                        frame
+                            .iter()
+                            .all(|line| line.starts_with("\x1b[1m") && line.ends_with("\x1b[22m"))
+                    );
+                    assert_eq!(
+                        frame
+                            .iter()
+                            .map(|line| line
+                                .strip_prefix("\x1b[1m")
+                                .unwrap()
+                                .strip_suffix("\x1b[22m")
+                                .unwrap()
+                                .to_string())
+                            .collect::<Vec<_>>(),
+                        plain.render_frame()
+                    );
+                };
+                check(&bold, &plain);
+                assert_eq!(bold.clone().with_bold(false), plain);
+                bold = bold.with_big(!big).with_big(big);
+                check(&bold, &plain);
+                for (width, height) in [(1, 1), (17, 5), (80, 24)] {
+                    bold.resize(context(width, height));
+                    let mut resized = plain.clone();
+                    resized.resize(context(width, height));
+                    check(&bold, &resized);
+                }
+            }
+        }
+        let classic = MatrixAnimation::new(context(40, 12));
+        assert_eq!(
+            classic.clone().with_bold(true).render_frame(),
+            classic.render_frame()
+        );
     }
 
     fn visible_glyphs(frame: &[String]) -> usize {

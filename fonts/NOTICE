@@ -18,6 +18,19 @@ advance and raises glyph height to ordinary Matrix capitals, at 1000 units/em.
 The family name is distinct from the upstream square-advance font.
 Derivative SHA256: b0ebee3d316d0afcdac01f506fbbebd721d880c6e13126eb43bf40a6def6abb5
 
+accelerando-terminal-bold.ttf is the Accelerando Terminal Bold companion.
+Each four-corner stroke is doubled in thickness around its center, then the
+complete alphabet is fitted vertically back to the Regular face's 0..778 ink
+bounds. Glyph IDs, character mappings, contour topology and 600-unit advances
+are preserved. The Regular derivative is unchanged. The Bold face has weight
+700 and uses the same family name so terminal bold styling can select it.
+Bold SHA256: a38efd97e02101e57ef8d153fe86ff380d9a59112c3813fb96fac4c1dc0cc6f0
+
 Regenerate with FontTools 4.61.1:
 python3 demo/import_accelerando_font.py /path/to/accelerando-8192
 Generation verifies the pinned source, all 8192 mappings, outlines and bounds.
+
+Regenerate Bold from the checked-in Regular face with FontTools 4.61.1:
+python3 demo/import_accelerando_bold_font.py
+Generation verifies the Regular hash, stroke geometry, all 8192 distinct glyphs,
+unchanged mappings and metrics, weight and ink bounds.

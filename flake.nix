@@ -30,6 +30,7 @@
       forAllSystems = nixpkgs.lib.genAttrs systems;
       fontPackage = pkgs: pkgs.runCommand "accelerando-terminal-font" { } ''
         install -Dm444 ${./fonts/accelerando-terminal.ttf} $out/share/fonts/truetype/accelerando-terminal.ttf
+        install -Dm444 ${./fonts/accelerando-terminal-bold.ttf} $out/share/fonts/truetype/accelerando-terminal-bold.ttf
         install -Dm444 ${./fonts/NOTICE} $out/share/licenses/accelerando-terminal/NOTICE
       '';
       animaPackage =

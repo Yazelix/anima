@@ -110,6 +110,7 @@ struct ScreenArgs {
     cell_style: GameOfLifeCellStyle,
     symbols: bool,
     big: bool,
+    bold: bool,
     duration: Option<Duration>,
     help: bool,
 }
@@ -168,7 +169,14 @@ pub fn run_screen_cli(
             let timing = parsed.duration.map(|duration| (Instant::now(), duration));
             install_termination_handlers()?;
             run_in_screen_mode(|| {
-                run_animation(style, parsed.cell_style, parsed.symbols, parsed.big, timing)
+                run_animation(
+                    style,
+                    parsed.cell_style,
+                    parsed.symbols,
+                    parsed.big,
+                    parsed.bold,
+                    timing,
+                )
             })
         }
     }
@@ -189,6 +197,7 @@ fn parse_screen_args(
     let mut cell_style = GameOfLifeCellStyle::FullBlock;
     let mut symbols = false;
     let mut big = false;
+    let mut bold = false;
     let mut duration = None;
     let mut iter = args.into_iter();
 
@@ -197,6 +206,7 @@ fn parse_screen_args(
             "-h" | "--help" | "help" => help = true,
             "--symbols" => symbols = true,
             "--big" => big = true,
+            "--bold" => bold = true,
             "--cell-style" => {
                 let Some(raw) = iter.next() else {
                     return Err("missing value after --cell-style".into());
@@ -236,6 +246,7 @@ fn parse_screen_args(
         cell_style,
         symbols,
         big,
+        bold,
         duration,
         help,
     })
@@ -243,7 +254,7 @@ fn parse_screen_args(
 
 fn print_screen_help(command_name: &str) -> Result<(), String> {
     let help = format!(
-        "Show Yazelix terminal screen animations\n\nUsage:\n  {command_name} [STYLE] [--big] [--symbols] [--cell-style full_block|dotted] [--duration-seconds N]\n\nStyles:\n  {}\n  random\n\nNotes:\n  accelerando uses only alien glyphs by default; --symbols mixes in letters, digits and punctuation\n  --big draws accelerando as large solid-block glyphs without changing terminal font size\n  normal accelerando requires the Accelerando Terminal font (bundled in Eon)\n  asciiquarium is a compatibility alias for native aquarium (not the classic renderer)\n  Animations, including Aquarium: Left/h/p = previous; Right/l/n = next; any other key = exit\n  Static: any key = exit\n",
+        "Show Yazelix terminal screen animations\n\nUsage:\n  {command_name} [STYLE] [--big] [--bold] [--symbols] [--cell-style full_block|dotted] [--duration-seconds N]\n\nStyles:\n  {}\n  random\n\nNotes:\n  accelerando uses only alien glyphs by default; --symbols mixes in letters, digits and punctuation\n  --big draws accelerando as large solid-block glyphs without changing terminal font size\n  --bold requests bold accelerando text at either size\n  normal accelerando requires the Accelerando Terminal font (bundled in Eon)\n  asciiquarium is a compatibility alias for native aquarium (not the classic renderer)\n  Animations, including Aquarium: Left/h/p = previous; Right/l/n = next; any other key = exit\n  Static: any key = exit\n",
         SCREEN_STYLES.join("\n  ")
     );
     let stdout = io::stdout();
@@ -355,11 +366,12 @@ fn run_animation(
     cell_style: GameOfLifeCellStyle,
     symbols: bool,
     big: bool,
+    bold: bool,
     timing: Option<(Instant, Duration)>,
 ) -> Result<(), String> {
     let mut width = terminal_width();
     let mut height = terminal_height();
-    let mut animation = build_animation(style, width, height, cell_style, symbols, big);
+    let mut animation = build_animation(style, width, height, cell_style, symbols, big, bold);
     let mut cadence = frame_delay(style);
     let mut frame = animation.render_frame();
     let mut card_started = Instant::now();
@@ -402,7 +414,7 @@ fn run_animation(
             Some(action @ (InputAction::Previous | InputAction::Next)) => {
                 style = browse_style(style, action);
                 (width, height) = current;
-                animation = build_animation(style, width, height, cell_style, symbols, big);
+                animation = build_animation(style, width, height, cell_style, symbols, big, bold);
                 cadence = frame_delay(style);
                 frame = animation.render_frame();
                 card_started = Instant::now();
@@ -553,6 +565,7 @@ fn build_animation(
     cell_style: GameOfLifeCellStyle,
     symbols: bool,
     big: bool,
+    bold: bool,
 ) -> Box<dyn ScreenFrameProducer> {
     let context = context_for_style(style, width, height);
     match style {
@@ -572,7 +585,8 @@ fn build_animation(
         AnimationStyle::Matrix(variant) => Box::new(
             MatrixAnimation::with_variant(context, variant)
                 .with_symbols(symbols)
-                .with_big(big),
+                .with_big(big)
+                .with_bold(bold),
         ),
     }
 }
@@ -933,6 +947,7 @@ mod tests {
                 12,
                 GameOfLifeCellStyle::FullBlock,
                 false,
+                false,
                 false
             )
             .render_frame(),
@@ -954,6 +969,7 @@ mod tests {
                 12,
                 GameOfLifeCellStyle::FullBlock,
                 false,
+                false,
                 false
             )
             .render_frame(),
@@ -970,6 +986,7 @@ mod tests {
                 12,
                 GameOfLifeCellStyle::FullBlock,
                 false,
+                false,
                 false
             )
             .render_frame(),
@@ -985,6 +1002,7 @@ mod tests {
                 40,
                 12,
                 GameOfLifeCellStyle::FullBlock,
+                false,
                 false,
                 false
             )
@@ -1004,6 +1022,7 @@ mod tests {
                 40,
                 12,
                 GameOfLifeCellStyle::FullBlock,
+                false,
                 false,
                 false
             )
@@ -1120,65 +1139,74 @@ mod tests {
         assert!(!parsed.help);
         assert!(!parsed.symbols);
         assert!(!parsed.big);
+        assert!(!parsed.bold);
 
-        for big in [false, true] {
-            for symbols in [false, true] {
-                let mut args = vec!["accelerando".to_string()];
-                if big {
-                    args.push("--big".to_string());
-                }
-                if symbols {
-                    args.push("--symbols".to_string());
-                }
-                let parsed = parse_screen_args(args, "anima").unwrap();
-                assert_eq!(parsed.symbols, symbols);
-                assert_eq!(parsed.big, big);
-                let ScreenStyle::Animation(style) =
-                    resolve_style(&parsed.style, None, "anima").unwrap()
-                else {
-                    panic!("expected animation")
-                };
-                for style in [
-                    style,
-                    browse_style(
-                        browse_style(style, InputAction::Previous),
-                        InputAction::Next,
-                    ),
-                ] {
-                    let frame = build_animation(
+        for bold in [false, true] {
+            for big in [false, true] {
+                for symbols in [false, true] {
+                    let mut args = vec!["accelerando".to_string()];
+                    if big {
+                        args.push("--big".to_string());
+                    }
+                    if symbols {
+                        args.push("--symbols".to_string());
+                    }
+                    if bold {
+                        args.push("--bold".to_string());
+                    }
+                    let parsed = parse_screen_args(args, "anima").unwrap();
+                    assert_eq!(parsed.symbols, symbols);
+                    assert_eq!(parsed.big, big);
+                    assert_eq!(parsed.bold, bold);
+                    let ScreenStyle::Animation(style) =
+                        resolve_style(&parsed.style, None, "anima").unwrap()
+                    else {
+                        panic!("expected animation")
+                    };
+                    for style in [
                         style,
-                        80,
-                        24,
-                        parsed.cell_style,
-                        parsed.symbols,
-                        parsed.big,
-                    )
-                    .render_frame();
-                    assert_eq!(
-                        frame,
-                        MatrixAnimation::with_variant(
-                            full_screen_context(80, 24),
-                            MatrixVariant::Accelerando
+                        browse_style(
+                            browse_style(style, InputAction::Previous),
+                            InputAction::Next,
+                        ),
+                    ] {
+                        let frame = build_animation(
+                            style,
+                            80,
+                            24,
+                            parsed.cell_style,
+                            parsed.symbols,
+                            parsed.big,
+                            parsed.bold,
                         )
-                        .with_symbols(symbols)
-                        .with_big(big)
-                        .render_frame()
-                    );
-                    let plain = strip_ansi(&frame.join("\n"));
-                    assert_eq!(
-                        plain.chars().any(|glyph| matches!(glyph, '▀' | '▄' | '█')),
-                        big
-                    );
-                    if !big {
-                        assert!(
-                            plain
-                                .chars()
-                                .any(|glyph| ('\u{100000}'..='\u{101fff}').contains(&glyph))
-                        );
+                        .render_frame();
                         assert_eq!(
-                            plain.chars().any(|glyph| glyph.is_ascii_alphanumeric()),
-                            symbols
+                            frame,
+                            MatrixAnimation::with_variant(
+                                full_screen_context(80, 24),
+                                MatrixVariant::Accelerando
+                            )
+                            .with_symbols(symbols)
+                            .with_big(big)
+                            .with_bold(bold)
+                            .render_frame()
                         );
+                        let plain = strip_ansi(&frame.join("\n"));
+                        assert_eq!(
+                            plain.chars().any(|glyph| matches!(glyph, '▀' | '▄' | '█')),
+                            big
+                        );
+                        if !big {
+                            assert!(
+                                plain
+                                    .chars()
+                                    .any(|glyph| ('\u{100000}'..='\u{101fff}').contains(&glyph))
+                            );
+                            assert_eq!(
+                                plain.chars().any(|glyph| glyph.is_ascii_alphanumeric()),
+                                symbols
+                            );
+                        }
                     }
                 }
             }

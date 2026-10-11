@@ -255,24 +255,27 @@ includes all native animation families with equal family weighting.
 In `accelerando`, Accelerando-8192 alien glyphs fall in long green trails with
 white heads and varied speeds. The default uses only the alien alphabet;
 `anima accelerando --symbols` mixes in Matrix's letters, digits, and punctuation.
-`anima accelerando --big` draws the original glyph geometry with bold solid
+`anima accelerando --big` draws the original glyph geometry with solid
 half-block pixels, about 7 columns × 4 rows per glyph, without changing your
 terminal font size. Combine `--big --symbols` for matching large letters,
-digits and punctuation. Fewer streams fit on screen at this size. Both options
-survive resizing and browsing away from Accelerando and back.
+digits and punctuation. Fewer streams fit on screen at this size.
+`anima accelerando --bold` selects heavier text weight independently of size and
+symbols; native alien glyphs use the bundled Bold face. Big mode's solid pixels
+already fill their cells. All three options survive resizing and browsing away from Accelerando and back.
 
 At the default size, all 8,192 glyphs use the **Accelerando Terminal** font at ordinary Matrix
-character height, with a blank column between streams. Eon bundles the font
-for its terminal surfaces. Big mode uses the original 7×7 bitmaps rather than
+character height, with a blank column between streams. Eon bundles both Regular
+and Bold faces for its terminal surfaces. Big mode uses the original 7×7 bitmaps rather than
 the font; every alien glyph remains distinct. Bitmap provenance is recorded in
 [src/accelerando-glyphs.NOTICE](src/accelerando-glyphs.NOTICE).
 Standalone terminals must load [fonts/accelerando-terminal.ttf](fonts/accelerando-terminal.ttf)
-and select it for U+100000–U+101FFF; without that setup they show missing glyphs.
+and [fonts/accelerando-terminal-bold.ttf](fonts/accelerando-terminal-bold.ttf)
+and select that family for U+100000–U+101FFF; without that setup they show missing glyphs.
 Keep the ordinary terminal text font and size. The font-only Nix output is
 `nix build .#accelerando-font`; the Anima package also exposes it in `share/fonts`.
-On Linux, install the TTF in `~/.local/share/fonts` and run `fc-cache -f`, then
+On Linux, install both TTFs in `~/.local/share/fonts` and run `fc-cache -f`, then
 configure that range in your terminal if automatic font selection is unavailable.
-Remove the TTF and refresh the font cache to uninstall it. Provenance, terminal
+Remove both TTFs and refresh the font cache to uninstall them. Provenance, terminal
 adaptation and permission are recorded in [fonts/NOTICE](fonts/NOTICE).
 
 In `aquarium`, small schools and striped reef fish swim past swaying kelp,
@@ -418,4 +421,4 @@ nix run .#anima -- --help
 
 ## LOC Scorecard
 
-`tokei src`: 7,105 Rust code lines, including unit tests. Big mode adds solid-block rendering, original block lettering and lossless bitmap checks; the embedded alien alphabet occupies 65,536 bytes. No runtime dependencies are added.
+`tokei src`: 7,193 Rust code lines, including unit tests. Accelerando's opt-in bold styling preserves size and symbol choices across resizing and browsing. Its Regular and Bold font assets occupy 1,714,564 bytes; the embedded bitmap alphabet occupies 65,536 bytes. No runtime dependencies are added.
