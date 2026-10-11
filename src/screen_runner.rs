@@ -109,6 +109,7 @@ struct ScreenArgs {
     style: String,
     cell_style: GameOfLifeCellStyle,
     symbols: bool,
+    big: bool,
     duration: Option<Duration>,
     help: bool,
 }
@@ -166,7 +167,9 @@ pub fn run_screen_cli(
         ScreenStyle::Animation(style) => {
             let timing = parsed.duration.map(|duration| (Instant::now(), duration));
             install_termination_handlers()?;
-            run_in_screen_mode(|| run_animation(style, parsed.cell_style, parsed.symbols, timing))
+            run_in_screen_mode(|| {
+                run_animation(style, parsed.cell_style, parsed.symbols, parsed.big, timing)
+            })
         }
     }
 }
@@ -185,6 +188,7 @@ fn parse_screen_args(
     let mut style = None;
     let mut cell_style = GameOfLifeCellStyle::FullBlock;
     let mut symbols = false;
+    let mut big = false;
     let mut duration = None;
     let mut iter = args.into_iter();
 
@@ -192,6 +196,7 @@ fn parse_screen_args(
         match arg.as_str() {
             "-h" | "--help" | "help" => help = true,
             "--symbols" => symbols = true,
+            "--big" => big = true,
             "--cell-style" => {
                 let Some(raw) = iter.next() else {
                     return Err("missing value after --cell-style".into());
@@ -230,6 +235,7 @@ fn parse_screen_args(
         style: style.unwrap_or_else(|| "random".to_string()),
         cell_style,
         symbols,
+        big,
         duration,
         help,
     })
@@ -237,7 +243,7 @@ fn parse_screen_args(
 
 fn print_screen_help(command_name: &str) -> Result<(), String> {
     let help = format!(
-        "Show Yazelix terminal screen animations\n\nUsage:\n  {command_name} [STYLE] [--symbols] [--cell-style full_block|dotted] [--duration-seconds N]\n\nStyles:\n  {}\n  random\n\nNotes:\n  accelerando uses only alien glyphs by default; --symbols mixes in letters, digits and punctuation\n  accelerando requires the Accelerando Terminal font (bundled in Eon)\n  asciiquarium is a compatibility alias for native aquarium (not the classic renderer)\n  Animations, including Aquarium: Left/h/p = previous; Right/l/n = next; any other key = exit\n  Static: any key = exit\n",
+        "Show Yazelix terminal screen animations\n\nUsage:\n  {command_name} [STYLE] [--big] [--symbols] [--cell-style full_block|dotted] [--duration-seconds N]\n\nStyles:\n  {}\n  random\n\nNotes:\n  accelerando uses only alien glyphs by default; --symbols mixes in letters, digits and punctuation\n  --big draws accelerando as large solid-block glyphs without changing terminal font size\n  normal accelerando requires the Accelerando Terminal font (bundled in Eon)\n  asciiquarium is a compatibility alias for native aquarium (not the classic renderer)\n  Animations, including Aquarium: Left/h/p = previous; Right/l/n = next; any other key = exit\n  Static: any key = exit\n",
         SCREEN_STYLES.join("\n  ")
     );
     let stdout = io::stdout();
@@ -348,11 +354,12 @@ fn run_animation(
     mut style: AnimationStyle,
     cell_style: GameOfLifeCellStyle,
     symbols: bool,
+    big: bool,
     timing: Option<(Instant, Duration)>,
 ) -> Result<(), String> {
     let mut width = terminal_width();
     let mut height = terminal_height();
-    let mut animation = build_animation(style, width, height, cell_style, symbols);
+    let mut animation = build_animation(style, width, height, cell_style, symbols, big);
     let mut cadence = frame_delay(style);
     let mut frame = animation.render_frame();
     let mut card_started = Instant::now();
@@ -395,7 +402,7 @@ fn run_animation(
             Some(action @ (InputAction::Previous | InputAction::Next)) => {
                 style = browse_style(style, action);
                 (width, height) = current;
-                animation = build_animation(style, width, height, cell_style, symbols);
+                animation = build_animation(style, width, height, cell_style, symbols, big);
                 cadence = frame_delay(style);
                 frame = animation.render_frame();
                 card_started = Instant::now();
@@ -545,6 +552,7 @@ fn build_animation(
     height: usize,
     cell_style: GameOfLifeCellStyle,
     symbols: bool,
+    big: bool,
 ) -> Box<dyn ScreenFrameProducer> {
     let context = context_for_style(style, width, height);
     match style {
@@ -561,9 +569,11 @@ fn build_animation(
         AnimationStyle::Chladni => Box::new(ChladniAnimation::new(context)),
         AnimationStyle::Plasma => Box::new(PlasmaAnimation::new(context)),
         AnimationStyle::Mandelbrot => Box::new(MandelbrotAnimation::new(context)),
-        AnimationStyle::Matrix(variant) => {
-            Box::new(MatrixAnimation::with_variant(context, variant).with_symbols(symbols))
-        }
+        AnimationStyle::Matrix(variant) => Box::new(
+            MatrixAnimation::with_variant(context, variant)
+                .with_symbols(symbols)
+                .with_big(big),
+        ),
     }
 }
 
@@ -922,6 +932,7 @@ mod tests {
                 40,
                 12,
                 GameOfLifeCellStyle::FullBlock,
+                false,
                 false
             )
             .render_frame(),
@@ -942,6 +953,7 @@ mod tests {
                 40,
                 12,
                 GameOfLifeCellStyle::FullBlock,
+                false,
                 false
             )
             .render_frame(),
@@ -957,6 +969,7 @@ mod tests {
                 40,
                 12,
                 GameOfLifeCellStyle::FullBlock,
+                false,
                 false
             )
             .render_frame(),
@@ -972,6 +985,7 @@ mod tests {
                 40,
                 12,
                 GameOfLifeCellStyle::FullBlock,
+                false,
                 false
             )
             .render_frame(),
@@ -990,6 +1004,7 @@ mod tests {
                 40,
                 12,
                 GameOfLifeCellStyle::FullBlock,
+                false,
                 false
             )
             .render_frame(),
@@ -1086,7 +1101,7 @@ mod tests {
 
     // Defends: CLI parsing keeps the package usable standalone while exposing the timed mode needed by integrated welcome.
     #[test]
-    fn parse_args_accepts_style_cell_style_duration_and_symbols() {
+    fn parse_args_routes_style_cell_style_duration_symbols_and_big() {
         let parsed = parse_screen_args(
             [
                 "game_of_life_gliders".to_string(),
@@ -1104,38 +1119,68 @@ mod tests {
         assert_eq!(parsed.duration, Some(Duration::from_secs(3)));
         assert!(!parsed.help);
         assert!(!parsed.symbols);
+        assert!(!parsed.big);
 
-        for symbols in [false, true] {
-            let mut args = vec!["accelerando".to_string()];
-            if symbols {
-                args.push("--symbols".to_string());
-            }
-            let parsed = parse_screen_args(args, "anima").unwrap();
-            assert_eq!(parsed.symbols, symbols);
-            let ScreenStyle::Animation(style) =
-                resolve_style(&parsed.style, None, "anima").unwrap()
-            else {
-                panic!("expected animation")
-            };
-            for style in [
-                style,
-                browse_style(
-                    browse_style(style, InputAction::Previous),
-                    InputAction::Next,
-                ),
-            ] {
-                let frame = build_animation(style, 80, 24, parsed.cell_style, parsed.symbols)
+        for big in [false, true] {
+            for symbols in [false, true] {
+                let mut args = vec!["accelerando".to_string()];
+                if big {
+                    args.push("--big".to_string());
+                }
+                if symbols {
+                    args.push("--symbols".to_string());
+                }
+                let parsed = parse_screen_args(args, "anima").unwrap();
+                assert_eq!(parsed.symbols, symbols);
+                assert_eq!(parsed.big, big);
+                let ScreenStyle::Animation(style) =
+                    resolve_style(&parsed.style, None, "anima").unwrap()
+                else {
+                    panic!("expected animation")
+                };
+                for style in [
+                    style,
+                    browse_style(
+                        browse_style(style, InputAction::Previous),
+                        InputAction::Next,
+                    ),
+                ] {
+                    let frame = build_animation(
+                        style,
+                        80,
+                        24,
+                        parsed.cell_style,
+                        parsed.symbols,
+                        parsed.big,
+                    )
                     .render_frame();
-                let plain = strip_ansi(&frame.join("\n"));
-                assert!(
-                    plain
-                        .chars()
-                        .any(|glyph| ('\u{100000}'..='\u{101fff}').contains(&glyph))
-                );
-                assert_eq!(
-                    plain.chars().any(|glyph| glyph.is_ascii_alphanumeric()),
-                    symbols
-                );
+                    assert_eq!(
+                        frame,
+                        MatrixAnimation::with_variant(
+                            full_screen_context(80, 24),
+                            MatrixVariant::Accelerando
+                        )
+                        .with_symbols(symbols)
+                        .with_big(big)
+                        .render_frame()
+                    );
+                    let plain = strip_ansi(&frame.join("\n"));
+                    assert_eq!(
+                        plain.chars().any(|glyph| matches!(glyph, '▀' | '▄' | '█')),
+                        big
+                    );
+                    if !big {
+                        assert!(
+                            plain
+                                .chars()
+                                .any(|glyph| ('\u{100000}'..='\u{101fff}').contains(&glyph))
+                        );
+                        assert_eq!(
+                            plain.chars().any(|glyph| glyph.is_ascii_alphanumeric()),
+                            symbols
+                        );
+                    }
+                }
             }
         }
     }

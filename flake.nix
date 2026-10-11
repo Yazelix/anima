@@ -85,6 +85,7 @@
 
           postInstall = ''
             install -Dm444 fonts/NOTICE $out/share/licenses/anima/accelerando-font.NOTICE
+            install -Dm444 src/accelerando-glyphs.NOTICE $out/share/licenses/anima/accelerando-glyphs.NOTICE
             ln -s ${fontPackage pkgs}/share/fonts $out/share/fonts
           '';
 

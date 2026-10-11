@@ -255,9 +255,17 @@ includes all native animation families with equal family weighting.
 In `accelerando`, Accelerando-8192 alien glyphs fall in long green trails with
 white heads and varied speeds. The default uses only the alien alphabet;
 `anima accelerando --symbols` mixes in Matrix's letters, digits, and punctuation.
-All 8,192 glyphs use the **Accelerando Terminal** font at ordinary Matrix
+`anima accelerando --big` draws the original glyph geometry with bold solid
+half-block pixels, about 7 columns × 4 rows per glyph, without changing your
+terminal font size. Combine `--big --symbols` for matching large letters,
+digits and punctuation. Fewer streams fit on screen at this size. Both options
+survive resizing and browsing away from Accelerando and back.
+
+At the default size, all 8,192 glyphs use the **Accelerando Terminal** font at ordinary Matrix
 character height, with a blank column between streams. Eon bundles the font
-for its terminal surfaces. There is no substitute alphabet or activation flag.
+for its terminal surfaces. Big mode uses the original 7×7 bitmaps rather than
+the font; every alien glyph remains distinct. Bitmap provenance is recorded in
+[src/accelerando-glyphs.NOTICE](src/accelerando-glyphs.NOTICE).
 Standalone terminals must load [fonts/accelerando-terminal.ttf](fonts/accelerando-terminal.ttf)
 and select it for U+100000–U+101FFF; without that setup they show missing glyphs.
 Keep the ordinary terminal text font and size. The font-only Nix output is
@@ -407,3 +415,7 @@ cargo run --example render_once
 nix build .#anima
 nix run .#anima -- --help
 ```
+
+## LOC Scorecard
+
+`tokei src`: 7,105 Rust code lines, including unit tests. Big mode adds solid-block rendering, original block lettering and lossless bitmap checks; the embedded alien alphabet occupies 65,536 bytes. No runtime dependencies are added.
