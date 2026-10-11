@@ -8,7 +8,90 @@ capable terminal; no Yazelix installation is required.
 
 ![Primordial particles, a Mandelbrot dive, Matrix rain, and Game of Life tumblers in Anima](assets/anima.gif)
 
-[See every animation](#animation-gallery).
+## Animation Gallery
+
+Each preview is a short looping excerpt, not a complete simulation cycle.
+Run the command above a GIF to watch that style in your terminal.
+
+### Logo
+
+`anima logo`
+
+![Yazelix welcome card cycling through its title and colored text](assets/animations/logo.gif)
+
+### Aquarium
+
+`anima aquarium`
+
+![A pixel-art whale passing reef fish, kelp, coral, and a sand crab](assets/animations/aquarium.gif)
+
+### Boids: Predator
+
+`anima boids_predator` (alias: `anima boids`)
+
+![Colored flocks scattering around a pursuing predator](assets/animations/boids_predator.gif)
+
+### Boids: Schools
+
+`anima boids_schools`
+
+![Schools of colored particles turning and swimming together](assets/animations/boids_schools.gif)
+
+### Friends and Enemies
+
+`anima friends_and_enemies`
+
+![Dense colored particles chasing friends and avoiding enemies](assets/animations/friends_and_enemies.gif)
+
+### Primordial
+
+`anima primordial`
+
+![Bright green particles moving across a dark field](assets/animations/primordial.gif)
+
+### Physarum
+
+`anima physarum`
+
+![Glowing trails joining into a branching transport network](assets/animations/physarum.gif)
+
+### Chladni
+
+`anima chladni`
+
+![Warm nodal lines shifting between blue and violet standing-wave patterns](assets/animations/chladni.gif)
+
+### Plasma
+
+`anima plasma`
+
+![Flowing colored bands formed by overlapping sine waves](assets/animations/plasma.gif)
+
+### Mandelbrot
+
+`anima mandelbrot`
+
+![A colorful zoom into the branching edge of the Mandelbrot set](assets/animations/mandelbrot.gif)
+
+### Matrix
+
+`anima matrix`
+
+![Green columns of glowing characters falling across the terminal](assets/animations/matrix.gif)
+
+### Game of Life: Gliders
+
+`anima game_of_life_gliders`
+
+![Small colored gliders traveling diagonally across a dark field](assets/animations/game_of_life_gliders.gif)
+
+### Game of Life: Tumblers
+
+`anima game_of_life_tumblers`
+
+![Rows of colored block patterns oscillating in Conway's Game of Life](assets/animations/game_of_life_tumblers.gif)
+
+## Try Anima
 
 The user-facing command is `anima`. The named Nix package/app is `anima`;
 the default Nix entry points select the same executable.
@@ -207,89 +290,6 @@ Its [credit and lineage](https://github.com/cablehead/asciiquarium-rs#credit-and
 honors Kirk Baucom's original Perl program, Joan Stark's ASCII art,
 Claudio Matsuoka's additions, and `cablehead`'s Rust port. Anima retains these
 historical credits but does not bundle the classic executable or its artwork.
-
-## Animation Gallery
-
-Each preview is a short looping excerpt, not a complete simulation cycle.
-Run the command above a GIF to watch that style in your terminal.
-
-### Logo
-
-`anima logo`
-
-![Yazelix welcome card cycling through its title and colored text](assets/animations/logo.gif)
-
-### Aquarium
-
-`anima aquarium`
-
-![A pixel-art whale passing reef fish, kelp, coral, and a sand crab](assets/animations/aquarium.gif)
-
-### Boids: Predator
-
-`anima boids_predator` (alias: `anima boids`)
-
-![Colored flocks scattering around a pursuing predator](assets/animations/boids_predator.gif)
-
-### Boids: Schools
-
-`anima boids_schools`
-
-![Schools of colored particles turning and swimming together](assets/animations/boids_schools.gif)
-
-### Friends and Enemies
-
-`anima friends_and_enemies`
-
-![Dense colored particles chasing friends and avoiding enemies](assets/animations/friends_and_enemies.gif)
-
-### Primordial
-
-`anima primordial`
-
-![Bright green particles moving across a dark field](assets/animations/primordial.gif)
-
-### Physarum
-
-`anima physarum`
-
-![Glowing trails joining into a branching transport network](assets/animations/physarum.gif)
-
-### Chladni
-
-`anima chladni`
-
-![Warm nodal lines shifting between blue and violet standing-wave patterns](assets/animations/chladni.gif)
-
-### Plasma
-
-`anima plasma`
-
-![Flowing colored bands formed by overlapping sine waves](assets/animations/plasma.gif)
-
-### Mandelbrot
-
-`anima mandelbrot`
-
-![A colorful zoom into the branching edge of the Mandelbrot set](assets/animations/mandelbrot.gif)
-
-### Matrix
-
-`anima matrix`
-
-![Green columns of glowing characters falling across the terminal](assets/animations/matrix.gif)
-
-### Game of Life: Gliders
-
-`anima game_of_life_gliders`
-
-![Small colored gliders traveling diagonally across a dark field](assets/animations/game_of_life_gliders.gif)
-
-### Game of Life: Tumblers
-
-`anima game_of_life_tumblers`
-
-![Rows of colored block patterns oscillating in Conway's Game of Life](assets/animations/game_of_life_tumblers.gif)
 
 ## Library Examples
 
