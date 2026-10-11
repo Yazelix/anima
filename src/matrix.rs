@@ -9,8 +9,7 @@ pub const ACCELERANDO_STYLE: &str = "accelerando";
 
 const MATRIX_GLYPHS: &[u8] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ@#$%&*+=-:;.";
 const ACCELERANDO_GLYPHS: &[u8; 8192 * 8] = include_bytes!("accelerando-glyphs.bin");
-const GLYPH_WIDTH: usize = 4;
-const GLYPH_PITCH: usize = 2;
+const GLYPH_WIDTH: usize = 2;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MatrixVariant {
@@ -26,13 +25,6 @@ impl MatrixVariant {
                 context.inner_width.div_ceil(GLYPH_WIDTH),
                 context.resolved_height,
             ),
-        }
-    }
-
-    fn pitch(self) -> usize {
-        match self {
-            Self::Classic => 1,
-            Self::Accelerando => GLYPH_PITCH,
         }
     }
 }
@@ -64,7 +56,7 @@ impl MatrixAnimation {
         let (width, height) = variant.dimensions(context);
         let mut seed = size_seed(width, height, 0x4D41_5452_4958);
         let columns = (0..width)
-            .map(|_| new_column(&mut seed, height, true, variant.pitch()))
+            .map(|_| new_column(&mut seed, height, true, variant))
             .collect();
         Self {
             context,
@@ -84,19 +76,35 @@ impl MatrixAnimation {
         let mut frame = ScreenFrame::new(width, height);
         for (x, column) in self.columns.iter().enumerate() {
             for age in 0..column.length {
-                let top = column.head - (age * GLYPH_PITCH) as i32;
+                let top = column.head - age as i32;
+                if top < 0 || top >= height as i32 {
+                    continue;
+                }
                 let mutation = self
                     .frame_index
                     .wrapping_add(x.wrapping_mul(17))
                     .wrapping_add(age * 11);
-                let id = matrix_glyph_hash(column.glyph_seed, x, age, mutation) as usize % 8192;
-                paint_accelerando_glyph(
-                    &mut frame,
-                    id,
-                    x * GLYPH_WIDTH,
-                    top,
-                    trail_tone(age, column.length),
-                );
+                let hash = matrix_glyph_hash(column.glyph_seed, x, age, mutation);
+                let tone = trail_tone(age, column.length);
+                if (hash >> 32).is_multiple_of(4) {
+                    frame.set(
+                        x * GLYPH_WIDTH,
+                        top as usize,
+                        ScreenCell::indexed(
+                            matrix_glyph(column.glyph_seed, x, age, mutation),
+                            0,
+                            tone,
+                        ),
+                    );
+                } else {
+                    paint_accelerando_glyph(
+                        &mut frame,
+                        hash as usize % 8192,
+                        x * GLYPH_WIDTH,
+                        top,
+                        tone,
+                    );
+                }
             }
         }
         frame.render_lines(self.context.resolved_width, colorize_matrix_cell)
@@ -135,7 +143,6 @@ impl ScreenFrameProducer for MatrixAnimation {
     fn advance_frame(&mut self) {
         self.frame_index = self.frame_index.wrapping_add(1);
         let (_, height) = self.variant.dimensions(self.context);
-        let pitch = self.variant.pitch();
         for column in &mut self.columns {
             if self
                 .frame_index
@@ -144,8 +151,8 @@ impl ScreenFrameProducer for MatrixAnimation {
             {
                 column.head += 1;
             }
-            if column.head as i64 - (column.length * pitch) as i64 >= height as i64 {
-                *column = new_column(&mut self.seed, height, false, pitch);
+            if column.head as i64 - column.length as i64 >= height as i64 {
+                *column = new_column(&mut self.seed, height, false, self.variant);
             }
         }
     }
@@ -159,9 +166,17 @@ pub fn matrix_frame_delay() -> Duration {
     Duration::from_millis(55)
 }
 
-fn new_column(seed: &mut u64, height: usize, warm: bool, pitch: usize) -> MatrixColumn {
-    let minimum_length = (height / pitch).clamp(1, 4);
-    let maximum_length = (height.saturating_mul(2) / 3 / pitch).clamp(minimum_length, 24);
+fn new_column(seed: &mut u64, height: usize, warm: bool, variant: MatrixVariant) -> MatrixColumn {
+    let (minimum_length, maximum_length) = match variant {
+        MatrixVariant::Classic => {
+            let minimum = height.clamp(1, 4);
+            (minimum, (height.saturating_mul(2) / 3).clamp(minimum, 24))
+        }
+        MatrixVariant::Accelerando => {
+            let minimum = (height / 2).clamp(1, 24);
+            (minimum, (height.saturating_mul(3) / 2).clamp(minimum, 72))
+        }
+    };
     let length = minimum_length + seeded_index(seed, maximum_length - minimum_length + 1);
     let speed = 1 + seeded_index(seed, 3);
     let head = if warm {
@@ -203,17 +218,16 @@ fn accelerando_bitmap(id: usize) -> u64 {
     u64::from_le_bytes(ACCELERANDO_GLYPHS[id * 8..(id + 1) * 8].try_into().unwrap())
 }
 
-fn accelerando_cells(bits: u64) -> [char; 8] {
-    // Braille preserves all 7x7 pixels in four columns and two terminal rows.
+fn accelerando_cells(bits: u64) -> [char; GLYPH_WIDTH] {
+    // Pool 2x2 source pixels into each dot to fit a glyph on one terminal row.
     const DOTS: [[u32; 2]; 4] = [[1, 8], [2, 16], [4, 32], [64, 128]];
     std::array::from_fn(|cell| {
         let mut dots = 0;
-        for (dy, row) in DOTS.iter().enumerate() {
-            for (dx, mask) in row.iter().enumerate() {
-                let x = (cell % GLYPH_WIDTH) * 2 + dx;
-                let y = (cell / GLYPH_WIDTH) * 4 + dy;
-                if x < 7 && y < 7 && bits & (1 << (y * 7 + x)) != 0 {
-                    dots |= mask;
+        for y in 0..7 {
+            for dx in 0..4 {
+                let x = cell * 4 + dx;
+                if x < 7 && bits & (1 << (y * 7 + x)) != 0 {
+                    dots |= DOTS[y / 2][dx / 2];
                 }
             }
         }
@@ -226,11 +240,10 @@ fn paint_accelerando_glyph(frame: &mut ScreenFrame, id: usize, left: usize, top:
         .into_iter()
         .enumerate()
     {
-        let y = top + (cell / GLYPH_WIDTH) as i32;
-        if y >= 0 && glyph != '⠀' {
+        if top >= 0 && glyph != '⠀' {
             frame.set(
-                left.saturating_add(cell % GLYPH_WIDTH),
-                y as usize,
+                left.saturating_add(cell),
+                top as usize,
                 ScreenCell::indexed(glyph, 0, tone),
             );
         }
@@ -308,7 +321,7 @@ mod tests {
     }
 
     #[test]
-    fn accelerando_preserves_glyphs_and_renders_bounded_moving_rain() {
+    fn accelerando_renders_small_glyphs_symbols_and_long_bounded_rain() {
         let bitmaps: std::collections::HashSet<_> = (0..8192).map(accelerando_bitmap).collect();
         assert_eq!(bitmaps.len(), 8192);
         assert!(bitmaps.iter().all(|&bits| bits > 0 && bits < (1 << 49)));
@@ -316,10 +329,15 @@ mod tests {
             .iter()
             .map(|&bits| accelerando_cells(bits))
             .collect();
-        assert_eq!(packed.len(), 8192);
+        assert!(packed.len() > 1000);
+        assert!(
+            packed
+                .iter()
+                .all(|cells| cells.iter().any(|&cell| cell != '⠀'))
+        );
         assert_eq!(
             accelerando_cells((1 << 0) | (1 << 6) | (1 << 42) | (1 << 48)),
-            ['⠁', '⠀', '⠀', '⠁', '⠄', '⠀', '⠀', '⠄']
+            ['⡁', '⢈']
         );
         // Glyph zero joins top-right to center, then left-center to bottom-left.
         let glyph = accelerando_bitmap(0);
@@ -329,17 +347,35 @@ mod tests {
         for (x, y) in [(0, 0), (6, 6)] {
             assert_eq!(glyph & (1 << (y * 7 + x)), 0);
         }
+        assert_eq!(accelerando_cells(glyph), ['⡖', '⠋']);
 
         let mut clipped = ScreenFrame::new(1, 1);
         paint_accelerando_glyph(&mut clipped, 0, 0, -1, 4);
-        assert!(clipped.render_lines(1, colorize_matrix_cell)[0].contains('⠇'));
+        assert_eq!(
+            visible_glyphs(&clipped.render_lines(1, colorize_matrix_cell)),
+            0
+        );
+        paint_accelerando_glyph(&mut clipped, 0, 0, 0, 4);
+        assert!(clipped.render_lines(1, colorize_matrix_cell)[0].contains('⡖'));
         paint_accelerando_glyph(&mut clipped, 0, usize::MAX, -1, 4);
 
         let mut first = MatrixAnimation::with_variant(context(80, 24), MatrixVariant::Accelerando);
         let mut second = first.clone();
         let initial = first.render_frame();
-        assert_eq!(first.columns.len(), 20);
-        assert!(visible_glyphs(&initial) > 320);
+        assert_eq!(first.columns.len(), 40);
+        assert!(visible_glyphs(&initial) > 600);
+        assert!(
+            first
+                .columns
+                .iter()
+                .all(|column| (12..=36).contains(&column.length))
+        );
+        assert!(first.columns.iter().any(|column| column.length > 24));
+        assert!(MATRIX_GLYPHS.iter().any(|&glyph| {
+            initial
+                .iter()
+                .any(|line| line.contains(&format!("m{}\u{1b}[39m", glyph as char)))
+        }));
         assert!(initial.join("").contains("38;5;15"));
         assert!(initial.join("").contains("38;5;28"));
         let mut shimmer = first.clone();
@@ -356,7 +392,12 @@ mod tests {
         for _ in 0..360 {
             first.advance_frame();
             second.advance_frame();
-            assert!(first.columns.iter().all(|column| column.length <= 24));
+            assert!(
+                first
+                    .columns
+                    .iter()
+                    .all(|column| (12..=36).contains(&column.length))
+            );
         }
         assert_eq!(first, second);
         assert_ne!(first.render_frame(), initial);
