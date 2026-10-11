@@ -13,12 +13,6 @@ capable terminal; no Yazelix installation is required.
 Each preview is a short looping excerpt, not a complete simulation cycle.
 Run the command above a GIF to watch that style in your terminal.
 
-### Logo
-
-`anima logo`
-
-![Yazelix welcome card cycling through its title and colored text](assets/animations/logo.gif)
-
 ### Aquarium
 
 `anima aquarium`
