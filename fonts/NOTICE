@@ -1,0 +1,23 @@
+Accelerando-8192 font and glyph artwork by gillverd
+https://github.com/gillverd/accelerando-8192
+Source revision: b1e789d50ce92af0ce142675d38da451d0c8d078
+Source: docs/assets/accelerando-8192.ttf
+Source SHA256: 4c1b5a2fb70dfd4f5930b95e8f48448035dc45ce7aced625944168cb2069f942
+
+Included and adapted with permission confirmed by Anima's maintainer on
+2026-10-11. Upstream declares no public license for this artwork/font. It is
+separate from Anima's Apache-2.0 implementation; no broader font license is
+asserted here. Upstream's MIT tokenizer notice does not license this artwork.
+No tokenizer, token text, song material or upstream rendering code is included.
+
+accelerando-terminal.ttf is the Accelerando Terminal Regular derivative.
+Glyph ID i maps to U+100000+i (8192 entries, through U+101FFF), avoiding the
+supplementary-A range used by Nerd Fonts. Outlines retain their orientation
+and topology. The affine transform x'=0.6x, y'=1.2y-211.2 fits a 600-unit mono
+advance and raises glyph height to ordinary Matrix capitals, at 1000 units/em.
+The family name is distinct from the upstream square-advance font.
+Derivative SHA256: b0ebee3d316d0afcdac01f506fbbebd721d880c6e13126eb43bf40a6def6abb5
+
+Regenerate with FontTools 4.61.1:
+python3 demo/import_accelerando_font.py /path/to/accelerando-8192
+Generation verifies the pinned source, all 8192 mappings, outlines and bounds.

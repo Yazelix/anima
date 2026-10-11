@@ -28,6 +28,10 @@
         "aarch64-darwin"
       ];
       forAllSystems = nixpkgs.lib.genAttrs systems;
+      fontPackage = pkgs: pkgs.runCommand "accelerando-terminal-font" { } ''
+        install -Dm444 ${./fonts/accelerando-terminal.ttf} $out/share/fonts/truetype/accelerando-terminal.ttf
+        install -Dm444 ${./fonts/NOTICE} $out/share/licenses/accelerando-terminal/NOTICE
+      '';
       animaPackage =
         system: pkgs:
         let
@@ -62,6 +66,7 @@
               ./Cargo.toml
               ./LICENSE
               ./README.md
+              ./fonts/NOTICE
               ./src
             ];
           };
@@ -79,7 +84,8 @@
           doCheck = false;
 
           postInstall = ''
-            install -Dm444 src/accelerando-glyphs.NOTICE $out/share/licenses/anima/accelerando-glyphs.NOTICE
+            install -Dm444 fonts/NOTICE $out/share/licenses/anima/accelerando-font.NOTICE
+            ln -s ${fontPackage pkgs}/share/fonts $out/share/fonts
           '';
 
           meta = {
@@ -100,6 +106,7 @@
         {
           default = anima;
           inherit anima;
+          accelerando-font = fontPackage pkgs;
         }
       );
 
@@ -125,6 +132,7 @@
                 environment = {
                   ANIMA_BIN = "${self.packages.${system}.anima}/bin/anima";
                   ANIMA_MARS = recording-mars.packages.${system}.mars;
+                  ANIMA_FONT = self.packages.${system}.accelerando-font;
                 };
               }
             }/bin/record-anima-demo";

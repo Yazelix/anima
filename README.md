@@ -77,7 +77,7 @@ Run the command above a GIF to watch that style in your terminal.
 
 `anima accelerando`
 
-![Small alien glyphs and code symbols falling in long green trails with white heads](assets/animations/accelerando.gif)
+![Native alien glyphs and code symbols falling in long green trails with white heads](assets/animations/accelerando.gif)
 
 ### Game of Life: Gliders
 
@@ -252,12 +252,19 @@ remains explicitly selectable but outside that pool. The library random helper
 includes all native animation families with equal family weighting.
 `matrix` and `accelerando` share the Matrix family in that helper.
 
-In `accelerando`, small Accelerando-8192 alien shapes mix with Matrix's letters,
+In `accelerando`, Accelerando-8192 alien glyphs mix with Matrix's letters,
 digits, and punctuation in long green trails with white heads and varied speeds.
-The original 8,192 glyphs remain embedded as 7×7 bitmaps; their compact Unicode
-Braille approximations occupy two terminal columns by one row. No custom font
-or external file is required. Glyph provenance and the maintainer-confirmed
-permission are recorded in [src/accelerando-glyphs.NOTICE](src/accelerando-glyphs.NOTICE).
+All 8,192 glyphs use the **Accelerando Terminal** font at ordinary Matrix
+character height, with a blank column between streams. Eon bundles the font
+for its terminal surfaces. There is no substitute alphabet or activation flag.
+Standalone terminals must load [fonts/accelerando-terminal.ttf](fonts/accelerando-terminal.ttf)
+and select it for U+100000–U+101FFF; without that setup they show missing glyphs.
+Keep the ordinary terminal text font and size. The font-only Nix output is
+`nix build .#accelerando-font`; the Anima package also exposes it in `share/fonts`.
+On Linux, install the TTF in `~/.local/share/fonts` and run `fc-cache -f`, then
+configure that range in your terminal if automatic font selection is unavailable.
+Remove the TTF and refresh the font cache to uninstall it. Provenance, terminal
+adaptation and permission are recorded in [fonts/NOTICE](fonts/NOTICE).
 
 In `aquarium`, small schools and striped reef fish swim past swaying kelp,
 coral, rocks, and rising bubbles. A ray, a slow whale, and a faster shark take

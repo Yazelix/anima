@@ -19,6 +19,27 @@ fn record(r: &mut Recorder) -> Result<()> {
     let mars = PathBuf::from(env::var_os("ANIMA_MARS").expect("Nix supplies ANIMA_MARS"));
     let anima = env::var_os("ANIMA_BIN").expect("Nix supplies ANIMA_BIN");
     let work = r.work().to_path_buf();
+    let base = work.join("mars-base");
+    fs::create_dir_all(&base)?;
+    for entry in fs::read_dir(mars.join("share/mars"))? {
+        let entry = entry?;
+        if entry.file_name() != "config.toml" {
+            std::os::unix::fs::symlink(entry.path(), base.join(entry.file_name()))?;
+        }
+    }
+    let font = PathBuf::from(env::var_os("ANIMA_FONT").expect("Nix supplies ANIMA_FONT"));
+    let base_config = fs::read_to_string(mars.join("share/mars/config.toml"))?;
+    assert!(base_config.contains("additional-dirs = [") && base_config.contains("symbol-map = ["));
+    fs::write(
+        base.join("config.toml"),
+        base_config.replace(
+            "additional-dirs = [",
+            &format!("additional-dirs = [\"{}/share/fonts/truetype\",", font.display()),
+        ).replace(
+            "symbol-map = [",
+            "symbol-map = [{ start = \"100000\", end = \"102000\", font-family = \"Accelerando Terminal\" },",
+        ),
+    )?;
     let recordings = demo.join(".work");
     fs::create_dir_all(&gallery)?;
     fs::create_dir_all(&recordings)?;
@@ -63,7 +84,7 @@ fn record(r: &mut Recorder) -> Result<()> {
                 .arg(style)
                 .env("MARS_CONFIG_HOME", demo.join("mars"))
                 .env("MARS_APP_ID", "anima-demo")
-                .env("MARS_BASE_CONFIG_HOME", mars.join("share/mars"))
+                .env("MARS_BASE_CONFIG_HOME", &base)
                 .env("YAZELIX_CONFIG_HOME", work.join("config"))
                 .env_remove("YAZELIX_CURSOR_CONFIG")
                 .env_remove("MARS_PROFILE"),

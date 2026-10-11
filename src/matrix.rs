@@ -8,7 +8,6 @@ pub const MATRIX_STYLE: &str = "matrix";
 pub const ACCELERANDO_STYLE: &str = "accelerando";
 
 const MATRIX_GLYPHS: &[u8] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ@#$%&*+=-:;.";
-const ACCELERANDO_GLYPHS: &[u8; 8192 * 8] = include_bytes!("accelerando-glyphs.bin");
 const GLYPH_WIDTH: usize = 2;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -86,25 +85,16 @@ impl MatrixAnimation {
                     .wrapping_add(age * 11);
                 let hash = matrix_glyph_hash(column.glyph_seed, x, age, mutation);
                 let tone = trail_tone(age, column.length);
-                if (hash >> 32).is_multiple_of(4) {
-                    frame.set(
-                        x * GLYPH_WIDTH,
-                        top as usize,
-                        ScreenCell::indexed(
-                            matrix_glyph(column.glyph_seed, x, age, mutation),
-                            0,
-                            tone,
-                        ),
-                    );
+                let glyph = if (hash >> 32).is_multiple_of(4) {
+                    matrix_glyph(column.glyph_seed, x, age, mutation)
                 } else {
-                    paint_accelerando_glyph(
-                        &mut frame,
-                        hash as usize % 8192,
-                        x * GLYPH_WIDTH,
-                        top,
-                        tone,
-                    );
-                }
+                    accelerando_glyph(hash as usize)
+                };
+                frame.set(
+                    x * GLYPH_WIDTH,
+                    top as usize,
+                    ScreenCell::indexed(glyph, 0, tone),
+                );
             }
         }
         frame.render_lines(self.context.resolved_width, colorize_matrix_cell)
@@ -214,40 +204,9 @@ fn matrix_glyph_hash(seed: u64, x: usize, y: usize, frame_index: usize) -> u64 {
     hash
 }
 
-fn accelerando_bitmap(id: usize) -> u64 {
-    u64::from_le_bytes(ACCELERANDO_GLYPHS[id * 8..(id + 1) * 8].try_into().unwrap())
-}
-
-fn accelerando_cells(bits: u64) -> [char; GLYPH_WIDTH] {
-    // Pool 2x2 source pixels into each dot to fit a glyph on one terminal row.
-    const DOTS: [[u32; 2]; 4] = [[1, 8], [2, 16], [4, 32], [64, 128]];
-    std::array::from_fn(|cell| {
-        let mut dots = 0;
-        for y in 0..7 {
-            for dx in 0..4 {
-                let x = cell * 4 + dx;
-                if x < 7 && bits & (1 << (y * 7 + x)) != 0 {
-                    dots |= DOTS[y / 2][dx / 2];
-                }
-            }
-        }
-        char::from_u32(0x2800 | dots).unwrap()
-    })
-}
-
-fn paint_accelerando_glyph(frame: &mut ScreenFrame, id: usize, left: usize, top: i32, tone: usize) {
-    for (cell, glyph) in accelerando_cells(accelerando_bitmap(id))
-        .into_iter()
-        .enumerate()
-    {
-        if top >= 0 && glyph != '⠀' {
-            frame.set(
-                left.saturating_add(cell),
-                top as usize,
-                ScreenCell::indexed(glyph, 0, tone),
-            );
-        }
-    }
+fn accelerando_glyph(id: usize) -> char {
+    // Supplementary-B avoids Eon's Nerd Font range; the bundled face owns these cells.
+    char::from_u32(0x100000 + (id % 8192) as u32).unwrap()
 }
 
 fn colorize_matrix_cell(cell: ScreenCell) -> String {
@@ -321,49 +280,34 @@ mod tests {
     }
 
     #[test]
-    fn accelerando_renders_small_glyphs_symbols_and_long_bounded_rain() {
-        let bitmaps: std::collections::HashSet<_> = (0..8192).map(accelerando_bitmap).collect();
-        assert_eq!(bitmaps.len(), 8192);
-        assert!(bitmaps.iter().all(|&bits| bits > 0 && bits < (1 << 49)));
-        let packed: std::collections::HashSet<_> = bitmaps
-            .iter()
-            .map(|&bits| accelerando_cells(bits))
-            .collect();
-        assert!(packed.len() > 1000);
+    fn accelerando_renders_native_glyphs_symbols_and_long_bounded_rain() {
+        let glyphs: std::collections::HashSet<_> = (0..8192).map(accelerando_glyph).collect();
+        assert_eq!(glyphs.len(), 8192);
+        assert_eq!(accelerando_glyph(0), '\u{100000}');
+        assert_eq!(accelerando_glyph(8191), '\u{101fff}');
         assert!(
-            packed
+            glyphs
                 .iter()
-                .all(|cells| cells.iter().any(|&cell| cell != '⠀'))
+                .all(|&glyph| ('\u{100000}'..='\u{101fff}').contains(&glyph))
         );
-        assert_eq!(
-            accelerando_cells((1 << 0) | (1 << 6) | (1 << 42) | (1 << 48)),
-            ['⡁', '⢈']
-        );
-        // Glyph zero joins top-right to center, then left-center to bottom-left.
-        let glyph = accelerando_bitmap(0);
-        for (x, y) in [(6, 0), (5, 1), (4, 2), (3, 3), (0, 3), (0, 6)] {
-            assert_ne!(glyph & (1 << (y * 7 + x)), 0);
-        }
-        for (x, y) in [(0, 0), (6, 6)] {
-            assert_eq!(glyph & (1 << (y * 7 + x)), 0);
-        }
-        assert_eq!(accelerando_cells(glyph), ['⡖', '⠋']);
-
-        let mut clipped = ScreenFrame::new(1, 1);
-        paint_accelerando_glyph(&mut clipped, 0, 0, -1, 4);
-        assert_eq!(
-            visible_glyphs(&clipped.render_lines(1, colorize_matrix_cell)),
-            0
-        );
-        paint_accelerando_glyph(&mut clipped, 0, 0, 0, 4);
-        assert!(clipped.render_lines(1, colorize_matrix_cell)[0].contains('⡖'));
-        paint_accelerando_glyph(&mut clipped, 0, usize::MAX, -1, 4);
 
         let mut first = MatrixAnimation::with_variant(context(80, 24), MatrixVariant::Accelerando);
         let mut second = first.clone();
         let initial = first.render_frame();
         assert_eq!(first.columns.len(), 40);
-        assert!(visible_glyphs(&initial) > 600);
+        assert!(visible_glyphs(&initial) > 400);
+        assert!(
+            initial
+                .iter()
+                .flat_map(|line| line.chars())
+                .any(|glyph| glyphs.contains(&glyph))
+        );
+        assert!(
+            !initial
+                .iter()
+                .flat_map(|line| line.chars())
+                .any(|glyph| ('\u{2800}'..='\u{28ff}').contains(&glyph))
+        );
         assert!(
             first
                 .columns
