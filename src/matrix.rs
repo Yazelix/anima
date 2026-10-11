@@ -1,9 +1,7 @@
 use std::time::Duration;
 
 use crate::random::{seeded_index, size_seed};
-use crate::{
-    HalfBlockField, RgbColor, ScreenAnimationContext, ScreenCell, ScreenFrame, ScreenFrameProducer,
-};
+use crate::{ScreenAnimationContext, ScreenCell, ScreenFrame, ScreenFrameProducer};
 use crossterm::style::Color;
 
 pub const MATRIX_STYLE: &str = "matrix";
@@ -11,15 +9,8 @@ pub const ACCELERANDO_STYLE: &str = "accelerando";
 
 const MATRIX_GLYPHS: &[u8] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ@#$%&*+=-:;.";
 const ACCELERANDO_GLYPHS: &[u8; 8192 * 8] = include_bytes!("accelerando-glyphs.bin");
-const GLYPH_PITCH: usize = 9;
-const RAIN_COLORS: [RgbColor; 6] = [
-    RgbColor::new(205, 255, 224),
-    RgbColor::new(142, 230, 176),
-    RgbColor::new(72, 184, 126),
-    RgbColor::new(38, 130, 72),
-    RgbColor::new(20, 83, 48),
-    RgbColor::new(8, 37, 20),
-];
+const GLYPH_WIDTH: usize = 4;
+const GLYPH_PITCH: usize = 2;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MatrixVariant {
@@ -32,8 +23,8 @@ impl MatrixVariant {
         match self {
             Self::Classic => (context.inner_width, context.resolved_height),
             Self::Accelerando => (
-                context.inner_width.div_ceil(GLYPH_PITCH),
-                context.resolved_height.saturating_mul(2),
+                context.inner_width.div_ceil(GLYPH_WIDTH),
+                context.resolved_height,
             ),
         }
     }
@@ -87,26 +78,28 @@ impl MatrixAnimation {
     fn render_accelerando(&self) -> Vec<String> {
         let width = self.context.inner_width;
         let (_, height) = self.variant.dimensions(self.context);
-        let mut pixels = HalfBlockField::new(width, height);
-        for y in 0..height {
-            for x in 0..width {
-                pixels.set(x, y, Some(RgbColor::new(0, 0, 0)));
-            }
+        if width == 0 || height == 0 {
+            return Vec::new();
         }
+        let mut frame = ScreenFrame::new(width, height);
         for (x, column) in self.columns.iter().enumerate() {
             for age in 0..column.length {
                 let top = column.head - (age * GLYPH_PITCH) as i32;
                 let mutation = self
                     .frame_index
                     .wrapping_add(x.wrapping_mul(17))
-                    .wrapping_add(age * 11)
-                    / 24;
+                    .wrapping_add(age * 11);
                 let id = matrix_glyph_hash(column.glyph_seed, x, age, mutation) as usize % 8192;
-                let color = RAIN_COLORS[age * RAIN_COLORS.len() / column.length];
-                paint_accelerando_glyph(&mut pixels, id, x * GLYPH_PITCH, top, color);
+                paint_accelerando_glyph(
+                    &mut frame,
+                    id,
+                    x * GLYPH_WIDTH,
+                    top,
+                    trail_tone(age, column.length),
+                );
             }
         }
-        pixels.render_lines(self.context.resolved_width)
+        frame.render_lines(self.context.resolved_width, colorize_matrix_cell)
     }
 }
 
@@ -210,26 +203,36 @@ fn accelerando_bitmap(id: usize) -> u64 {
     u64::from_le_bytes(ACCELERANDO_GLYPHS[id * 8..(id + 1) * 8].try_into().unwrap())
 }
 
-fn paint_accelerando_glyph(
-    pixels: &mut HalfBlockField,
-    id: usize,
-    left: usize,
-    top: i32,
-    color: RgbColor,
-) {
-    let bits = accelerando_bitmap(id);
-    for y in 0..7 {
-        if top + y < 0 {
-            continue;
-        }
-        for x in 0..7 {
-            if bits & (1 << (y * 7 + x)) != 0 {
-                pixels.set(
-                    left.saturating_add(x as usize),
-                    (top + y) as usize,
-                    Some(color),
-                );
+fn accelerando_cells(bits: u64) -> [char; 8] {
+    // Braille preserves all 7x7 pixels in four columns and two terminal rows.
+    const DOTS: [[u32; 2]; 4] = [[1, 8], [2, 16], [4, 32], [64, 128]];
+    std::array::from_fn(|cell| {
+        let mut dots = 0;
+        for (dy, row) in DOTS.iter().enumerate() {
+            for (dx, mask) in row.iter().enumerate() {
+                let x = (cell % GLYPH_WIDTH) * 2 + dx;
+                let y = (cell / GLYPH_WIDTH) * 4 + dy;
+                if x < 7 && y < 7 && bits & (1 << (y * 7 + x)) != 0 {
+                    dots |= mask;
+                }
             }
+        }
+        char::from_u32(0x2800 | dots).unwrap()
+    })
+}
+
+fn paint_accelerando_glyph(frame: &mut ScreenFrame, id: usize, left: usize, top: i32, tone: usize) {
+    for (cell, glyph) in accelerando_cells(accelerando_bitmap(id))
+        .into_iter()
+        .enumerate()
+    {
+        let y = top + (cell / GLYPH_WIDTH) as i32;
+        if y >= 0 && glyph != '⠀' {
+            frame.set(
+                left.saturating_add(cell % GLYPH_WIDTH),
+                y as usize,
+                ScreenCell::indexed(glyph, 0, tone),
+            );
         }
     }
 }
@@ -309,6 +312,15 @@ mod tests {
         let bitmaps: std::collections::HashSet<_> = (0..8192).map(accelerando_bitmap).collect();
         assert_eq!(bitmaps.len(), 8192);
         assert!(bitmaps.iter().all(|&bits| bits > 0 && bits < (1 << 49)));
+        let packed: std::collections::HashSet<_> = bitmaps
+            .iter()
+            .map(|&bits| accelerando_cells(bits))
+            .collect();
+        assert_eq!(packed.len(), 8192);
+        assert_eq!(
+            accelerando_cells((1 << 0) | (1 << 6) | (1 << 42) | (1 << 48)),
+            ['⠁', '⠀', '⠀', '⠁', '⠄', '⠀', '⠀', '⠄']
+        );
         // Glyph zero joins top-right to center, then left-center to bottom-left.
         let glyph = accelerando_bitmap(0);
         for (x, y) in [(6, 0), (5, 1), (4, 2), (3, 3), (0, 3), (0, 6)] {
@@ -318,18 +330,29 @@ mod tests {
             assert_eq!(glyph & (1 << (y * 7 + x)), 0);
         }
 
-        let color = RgbColor::new(200, 255, 220);
-        let mut clipped = HalfBlockField::new(1, 1);
-        paint_accelerando_glyph(&mut clipped, 0, 0, -6, color);
-        assert!(clipped.render_lines(1)[0].contains("200;255;220"));
-        paint_accelerando_glyph(&mut clipped, 0, usize::MAX, -6, color);
+        let mut clipped = ScreenFrame::new(1, 1);
+        paint_accelerando_glyph(&mut clipped, 0, 0, -1, 4);
+        assert!(clipped.render_lines(1, colorize_matrix_cell)[0].contains('⠇'));
+        paint_accelerando_glyph(&mut clipped, 0, usize::MAX, -1, 4);
 
         let mut first = MatrixAnimation::with_variant(context(80, 24), MatrixVariant::Accelerando);
         let mut second = first.clone();
         let initial = first.render_frame();
-        assert_eq!(first.columns.len(), 9);
-        assert!(initial.join("").contains("205;255;224"));
-        assert!(initial.join("").contains("20;83;48"));
+        assert_eq!(first.columns.len(), 20);
+        assert!(visible_glyphs(&initial) > 320);
+        assert!(initial.join("").contains("38;5;15"));
+        assert!(initial.join("").contains("38;5;28"));
+        let mut shimmer = first.clone();
+        shimmer.columns.truncate(1);
+        shimmer.columns[0].head = 0;
+        shimmer.columns[0].length = 1;
+        let patterns: std::collections::HashSet<_> = (0..24)
+            .map(|frame| {
+                shimmer.frame_index = frame;
+                shimmer.render_frame()
+            })
+            .collect();
+        assert!(patterns.len() >= 10);
         for _ in 0..360 {
             first.advance_frame();
             second.advance_frame();

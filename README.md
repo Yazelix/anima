@@ -77,7 +77,7 @@ Run the command above a GIF to watch that style in your terminal.
 
 `anima accelerando`
 
-![Angular alien glyphs falling in mint-green columns with bright heads and fading trails](assets/animations/accelerando.gif)
+![Compact alien glyphs falling in green columns with white heads and fading trails](assets/animations/accelerando.gif)
 
 ### Game of Life: Gliders
 
@@ -252,11 +252,11 @@ remains explicitly selectable but outside that pool. The library random helper
 includes all native animation families with equal family weighting.
 `matrix` and `accelerando` share the Matrix family in that helper.
 
-In `accelerando`, the Accelerando-8192 alien glyphs fall in mint-green
-columns with bright heads, fading trails, and varied speeds. All 8,192 glyphs
-retain their original orientation in embedded 7×7 bitmaps, drawn with square
-truecolor half-block pixels under the 2:1 terminal-cell convention. No custom
-font or external file is required. Glyph provenance and the maintainer-confirmed
+In `accelerando`, the Accelerando-8192 alien glyphs use Matrix's white heads,
+green fading trails, varied speeds, and changing symbols. All 8,192 glyphs
+retain their original orientation in embedded 7×7 bitmaps, packed into Unicode
+Braille at four terminal columns by two rows per glyph. No custom font or
+external file is required. Glyph provenance and the maintainer-confirmed
 permission are recorded in [src/accelerando-glyphs.NOTICE](src/accelerando-glyphs.NOTICE).
 
 In `aquarium`, small schools and striped reef fish swim past swaying kelp,
