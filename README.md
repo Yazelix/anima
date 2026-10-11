@@ -75,9 +75,9 @@ Run the command above a GIF to watch that style in your terminal.
 
 ### Accelerando
 
-`anima accelerando`
+`anima accelerando --bold`
 
-![Native alien glyphs falling in long green trails with white heads](assets/animations/accelerando.gif)
+![Large, bold native alien glyphs falling in long green trails with white heads](assets/animations/accelerando.gif)
 
 ### Game of Life: Gliders
 
@@ -390,8 +390,11 @@ nix run .#record-demo
 
 Run this from the repository root on x86_64 Linux. The recipe exports a
 two-second excerpt per style after a four-second warm-up (15 seconds for
-Physarum). Each `assets/animations/STYLE.gif` is 640 × 360 at 10 FPS with a
-64-color palette. Capture headroom keeps shutdown frames out of the excerpts.
+Physarum). Accelerando uses the 28px Accelerando Terminal font with `--bold`, exported at
+960 × 540 and 20 FPS with a 256-color palette and no dithering. The other
+`assets/animations/STYLE.gif` previews use a 14px font, exported at 640 × 360
+and 10 FPS with a 64-color palette. Capture headroom keeps shutdown frames out
+of the excerpts.
 Live recordings vary between takes.
 The eight-second hero montage reuses two seconds each of Primordial, Mandelbrot,
 Matrix, and tumblers. [A still preview](assets/anima-poster.png) is also available.
@@ -421,4 +424,4 @@ nix run .#anima -- --help
 
 ## LOC Scorecard
 
-`tokei src`: 7,193 Rust code lines, including unit tests. Accelerando's opt-in bold styling preserves size and symbol choices across resizing and browsing. Its Regular and Bold font assets occupy 1,714,564 bytes; the embedded bitmap alphabet occupies 65,536 bytes. No runtime dependencies are added.
+`tokei src`: 7,193 Rust code lines, including unit tests. Accelerando's opt-in bold styling preserves size and symbol choices across resizing and browsing. Its Regular and Bold font assets occupy 1,714,564 bytes; the embedded bitmap alphabet occupies 65,536 bytes. The recording recipe gives its preview a larger font and a full-resolution, 20 FPS export. No runtime dependencies are added.

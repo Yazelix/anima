@@ -40,6 +40,18 @@ fn record(r: &mut Recorder) -> Result<()> {
             "symbol-map = [{ start = \"100000\", end = \"102000\", font-family = \"Accelerando Terminal\" },",
         ),
     )?;
+    let large_font = work.join("mars-accelerando");
+    fs::create_dir_all(&large_font)?;
+    let config = fs::read_to_string(demo.join("mars/config.toml"))?;
+    assert_eq!(config.matches("size = 14.0").count(), 1);
+    assert!(config.contains("family = \"JetBrains Mono\""));
+    fs::write(
+        large_font.join("config.toml"),
+        config.replace("size = 14.0", "size = 28.0").replace(
+            "family = \"JetBrains Mono\"",
+            "family = \"Accelerando Terminal\"\nsymbol-map = []",
+        ),
+    )?;
     let recordings = demo.join(".work");
     fs::create_dir_all(&gallery)?;
     fs::create_dir_all(&recordings)?;
@@ -76,13 +88,22 @@ fn record(r: &mut Recorder) -> Result<()> {
     let mut total = 0;
     for (style, warmup) in styles {
         eprintln!("Recording {style}...");
+        let accelerando = style == "accelerando";
         r.launch(
             "anima-demo",
             Command::new(mars.join("bin/mars"))
                 .args(["-e"])
                 .arg(&anima)
                 .arg(style)
-                .env("MARS_CONFIG_HOME", demo.join("mars"))
+                .args(if accelerando { &["--bold"][..] } else { &[] })
+                .env(
+                    "MARS_CONFIG_HOME",
+                    if accelerando {
+                        large_font.clone()
+                    } else {
+                        demo.join("mars")
+                    },
+                )
                 .env("MARS_APP_ID", "anima-demo")
                 .env("MARS_BASE_CONFIG_HOME", &base)
                 .env("YAZELIX_CONFIG_HOME", work.join("config"))
@@ -95,7 +116,7 @@ fn record(r: &mut Recorder) -> Result<()> {
         r.record(&recording, |r| r.sleep(Duration::from_secs(3)))?;
         r.stop_app()?;
         let gif = gallery.join(format!("{style}.gif"));
-        export_gif(r, &recording, &gif, 2)?;
+        export_gif(r, &recording, &gif, 2, accelerando)?;
         let bytes = fs::metadata(&gif)?.len();
         eprintln!("{style}.gif: {bytes} bytes");
         total += bytes;
@@ -117,7 +138,7 @@ fn record(r: &mut Recorder) -> Result<()> {
     command.args(["-filter_complex", "[0:v]trim=duration=2,setpts=PTS-STARTPTS[a];[1:v]trim=duration=2,setpts=PTS-STARTPTS[b];[2:v]trim=duration=2,setpts=PTS-STARTPTS[c];[3:v]trim=duration=2,setpts=PTS-STARTPTS[d];[a][b][c][d]concat=n=4:v=1:a=0[v]",
         "-map", "[v]", "-an", "-c:v", "libx264", "-crf", "18", "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-y"]).arg(&montage);
     r.exec(&mut command)?;
-    export_gif(r, &montage, &assets.join("anima.gif"), 8)?;
+    export_gif(r, &montage, &assets.join("anima.gif"), 8, false)?;
     r.poster(
         &montage,
         Duration::from_millis(2500),
@@ -137,15 +158,33 @@ fn record(r: &mut Recorder) -> Result<()> {
     )
 }
 
-fn export_gif(r: &mut Recorder, input: &Path, output: &Path, seconds: u32) -> Result<()> {
-    // Keep terminal blocks readable without spending 256 colors on capture noise.
+fn export_gif(
+    r: &mut Recorder,
+    input: &Path,
+    output: &Path,
+    seconds: u32,
+    high_quality: bool,
+) -> Result<()> {
+    let filter = if high_quality {
+        "fps=20,split[a][b];[a]palettegen=max_colors=256[p];[b][p]paletteuse=dither=none"
+    } else {
+        // Keep terminal blocks readable without spending 256 colors on capture noise.
+        "fps=10,scale=640:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=64[p];[b][p]paletteuse=dither=bayer"
+    };
     r.exec(
         Command::new("ffmpeg")
-            .args(["-hide_banner", "-loglevel", "error", "-nostdin", "-abort_on", "empty_output"])
+            .args([
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-nostdin",
+                "-abort_on",
+                "empty_output",
+            ])
             .arg("-i")
             .arg(input)
             .arg("-filter_complex")
-            .arg(format!("trim=duration={seconds},fps=10,scale=640:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=64[p];[b][p]paletteuse=dither=bayer"))
+            .arg(format!("trim=duration={seconds},{filter}"))
             .args(["-loop", "0", "-y"])
             .arg(output),
     )
