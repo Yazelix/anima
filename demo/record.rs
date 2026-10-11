@@ -24,7 +24,6 @@ fn record(r: &mut Recorder) -> Result<()> {
     fs::create_dir_all(&recordings)?;
     // Warm-up seconds: allow trails to develop and the Aquarium whale to arrive.
     let styles = [
-        ("logo", 4),
         ("aquarium", 23),
         ("boids_predator", 4),
         ("boids_schools", 4),

@@ -113,7 +113,7 @@ nix run github:Yazelix/anima#anima -- random --duration-seconds 3
 ## What It Contains
 
 - Native animation engines for Aquarium, Boids, friends and enemies, Primordial Particle Systems, Physarum trail networks, Chladni nodal patterns, Plasma interference, Mandelbrot, Matrix rain, and Game of Life
-- Static and logo-style Yazelix welcome screens
+- A static Yazelix welcome screen
 - File-backed Kitty PNG frame sequence rendering
 - Frame production through `ScreenFrameProducer`
 - Terminal sizing helpers and alternate-screen rendering helpers
@@ -239,7 +239,7 @@ switching does not extend the session. The RGB fade uses an opaque black
 backing inside the border for contrast; border cells use the terminal's normal
 background so the fill does not extend outside the rounded outline.
 Credits wrap in narrow terminals; the card stays hidden
-if the complete text cannot fit. Static and logo do not use this card.
+if the complete text cannot fit. `static` does not use this card.
 Library frame producers return animation-only frames
 
 Native playback replaces rows without first clearing the entire screen. Each
@@ -247,8 +247,8 @@ frame and identity card share one synchronized update. On Unix, playback exits
 when its input terminal closes, including closures that send no signal.
 
 Random chooses from all current native animations, including Aquarium,
-`friends_and_enemies`, `physarum`, `chladni`, and `plasma`. `static` and `logo`
-remain explicitly selectable but outside that pool. The library random helper
+`friends_and_enemies`, `physarum`, `chladni`, and `plasma`. `static`
+remains explicitly selectable but outside that pool. The library random helper
 includes all native animation families with equal family weighting.
 `matrix` and `accelerando` share the Matrix family in that helper.
 

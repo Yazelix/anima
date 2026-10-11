@@ -53,8 +53,7 @@ pub use random::{
 };
 pub use scalar_field::ScalarField;
 pub use screen_runner::{
-    ASCIQUARIUM_STYLE, LOGO_STYLE, SCREEN_RANDOM_STYLES, SCREEN_STYLES, STATIC_STYLE,
-    run_screen_cli,
+    ASCIQUARIUM_STYLE, SCREEN_RANDOM_STYLES, SCREEN_STYLES, STATIC_STYLE, run_screen_cli,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

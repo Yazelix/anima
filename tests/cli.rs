@@ -11,6 +11,11 @@ fn standalone_and_integrated_commands_report_their_own_names() {
                 false,
                 format!("unsupported screen style `not-a-style`. Try `{name} --help`\n"),
             ),
+            (
+                "logo",
+                false,
+                format!("unsupported screen style `logo`. Try `{name} --help`\n"),
+            ),
         ] {
             let mut command = Command::new(env!("CARGO_BIN_EXE_anima"));
             command.arg(arg).env_remove("YAZELIX_SCREEN_COMMAND_NAME");
@@ -60,7 +65,6 @@ fn closing_the_terminal_exits_timed_and_interactive_playback() {
         "boids_predator",
         "accelerando",
         "static",
-        "logo",
     ] {
         for timed in [false, true] {
             for controlling in [false, true] {

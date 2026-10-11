@@ -24,10 +24,8 @@ use std::time::{Duration, Instant};
 /// Compatibility spelling for the native Aquarium.
 pub const ASCIQUARIUM_STYLE: &str = "asciiquarium";
 pub const STATIC_STYLE: &str = "static";
-pub const LOGO_STYLE: &str = "logo";
 pub const SCREEN_STYLES: &[&str] = &[
     STATIC_STYLE,
-    LOGO_STYLE,
     AQUARIUM_STYLE,
     "boids",
     "boids_predator",
@@ -63,7 +61,6 @@ pub const SCREEN_RANDOM_STYLES: &[&str] = &[
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ScreenStyle {
     Static,
-    Logo,
     Animation(AnimationStyle),
 }
 
@@ -165,7 +162,6 @@ pub fn run_screen_cli(
 
     match resolve_style(&parsed.style, None, command_name)? {
         ScreenStyle::Static => run_in_screen_mode(|| run_static(parsed.duration)),
-        ScreenStyle::Logo => run_in_screen_mode(|| run_logo(parsed.duration)),
         ScreenStyle::Animation(style) => {
             let timing = parsed.duration.map(|duration| (Instant::now(), duration));
             install_termination_handlers()?;
@@ -237,7 +233,7 @@ fn parse_screen_args(
 
 fn print_screen_help(command_name: &str) -> Result<(), String> {
     let help = format!(
-        "Show Yazelix terminal screen animations\n\nUsage:\n  {command_name} [STYLE] [--cell-style full_block|dotted] [--duration-seconds N]\n\nStyles:\n  {}\n  random\n\nNotes:\n  asciiquarium is a compatibility alias for native aquarium (not the classic renderer)\n  Animations, including Aquarium: Left/h/p = previous; Right/l/n = next; any other key = exit\n  Static and logo: any key = exit\n",
+        "Show Yazelix terminal screen animations\n\nUsage:\n  {command_name} [STYLE] [--cell-style full_block|dotted] [--duration-seconds N]\n\nStyles:\n  {}\n  random\n\nNotes:\n  asciiquarium is a compatibility alias for native aquarium (not the classic renderer)\n  Animations, including Aquarium: Left/h/p = previous; Right/l/n = next; any other key = exit\n  Static: any key = exit\n",
         SCREEN_STYLES.join("\n  ")
     );
     let stdout = io::stdout();
@@ -259,9 +255,6 @@ fn resolve_style(
     }
     if normalized == STATIC_STYLE {
         return Ok(ScreenStyle::Static);
-    }
-    if normalized == LOGO_STYLE {
-        return Ok(ScreenStyle::Logo);
     }
     if normalized == AQUARIUM_STYLE || normalized == ASCIQUARIUM_STYLE {
         return Ok(ScreenStyle::Animation(AnimationStyle::Aquarium));
@@ -343,40 +336,6 @@ fn run_static(duration: Option<Duration>) -> Result<(), String> {
         if current != (width, height) {
             (width, height) = current;
             render_centered_static(width, height)?;
-        }
-    }
-}
-
-fn run_logo(duration: Option<Duration>) -> Result<(), String> {
-    let mut width = terminal_width();
-    let mut height = terminal_height();
-    let mut frames = logo_frames(width, height);
-    if let Some(duration) = duration {
-        let delay = duration / frames.len() as u32;
-        for frame in frames {
-            render_screen_frame(&frame)
-                .map_err(|error| format!("could not render logo: {error}"))?;
-            if poll_for_input(delay)?.is_some() {
-                break;
-            }
-        }
-        return Ok(());
-    }
-
-    let mut index = 0usize;
-    loop {
-        render_screen_frame(&frames[index % frames.len()])
-            .map_err(|error| format!("could not render logo frame: {error}"))?;
-        if poll_for_input(Duration::from_millis(180))?.is_some() {
-            return Ok(());
-        }
-        let current = (terminal_width(), terminal_height());
-        if current != (width, height) {
-            (width, height) = current;
-            frames = logo_frames(width, height);
-            index = 0;
-        } else {
-            index += 1;
         }
     }
 }
@@ -682,7 +641,7 @@ fn poll_for_input(timeout: Duration) -> Result<Option<InputAction>, String> {
     let poll_interval = Duration::from_millis(50);
 
     loop {
-        // Long static/logo waits must still notice terminal loss and shutdown.
+        // Long static waits must still notice terminal loss and shutdown.
         let ready = event::poll(wait.min(poll_interval))
             .map_err(|error| format!("could not poll terminal input: {error}"))?;
         if remaining(None) == Some(Duration::ZERO) || (had_terminal && !io::stdin().is_terminal()) {
@@ -712,49 +671,20 @@ fn render_centered_static(width: usize, height: usize) -> Result<(), String> {
         .map_err(|error| format!("could not render static welcome: {error}"))
 }
 
-fn logo_frames(width: usize, height: usize) -> Vec<Vec<String>> {
-    let spec = WelcomeSpec::for_width(width);
-    let full = static_card_lines(spec, spec.body.len(), true, width);
-    let title = static_card_lines(spec, 0, false, width);
-    let first = static_card_lines(spec, 1, true, width);
-    [title, first, full]
-        .into_iter()
-        .map(|frame| center_vertically(frame, height))
-        .collect()
-}
-
 fn static_card(width: usize) -> Vec<String> {
     let spec = WelcomeSpec::for_width(width);
-    static_card_lines(spec, spec.body.len(), true, width)
-}
-
-fn static_card_lines(
-    spec: WelcomeSpec,
-    body_count: usize,
-    full_title: bool,
-    width: usize,
-) -> Vec<String> {
     let content_width = spec.inner_width + 2;
-    let title = if full_title { "YAZELIX" } else { "YZS" };
     let mut lines = vec![
         magenta(format!("╭{}╮", "─".repeat(spec.inner_width))),
-        if full_title {
-            colorize_logo(&center_text(title, content_width))
-        } else {
-            dim(center_text(title, content_width))
-        },
+        colorize_title(&center_text("YAZELIX", content_width)),
     ];
-    for (index, body) in spec.body.iter().enumerate() {
+    for body in spec.body {
         let line = if spec.center_body {
             center_text(body, content_width)
         } else {
             format!("{body:<content_width$}")
         };
-        if index < body_count {
-            lines.push(colorize_body(&line));
-        } else {
-            lines.push(dim(" ".repeat(content_width)));
-        }
+        lines.push(colorize_body(&line));
     }
     lines.push(yellow(center_text("welcome to yazelix", content_width)));
     lines.push(magenta(format!("╰{}╯", "─".repeat(spec.inner_width))));
@@ -829,7 +759,7 @@ fn size_class(width: usize) -> &'static str {
     }
 }
 
-fn colorize_logo(text: &str) -> String {
+fn colorize_title(text: &str) -> String {
     const COLORS: &[&str] = &["31", "32", "33", "34", "35"];
     text.chars()
         .enumerate()
@@ -883,10 +813,6 @@ fn yellow(text: impl AsRef<str>) -> String {
 
 fn magenta(text: impl AsRef<str>) -> String {
     ansi("35", text.as_ref())
-}
-
-fn dim(text: impl AsRef<str>) -> String {
-    ansi("2", text.as_ref())
 }
 
 fn ansi(code: &str, text: impl AsRef<str>) -> String {
@@ -1060,7 +986,7 @@ mod tests {
         );
     }
 
-    // Defends: every current animation resolves from random; static/logo never do.
+    // Defends: every current animation resolves from random; static never does.
     #[test]
     fn random_pool_resolves_current_animations_with_existing_alias_weight() {
         let mut native = Vec::new();

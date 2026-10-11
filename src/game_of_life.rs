@@ -507,7 +507,7 @@ mod tests {
         );
     }
 
-    // Defends: retained Game of Life screen states still roll forward instead of collapsing into a fixed logo frame.
+    // Defends: retained Game of Life screen states still roll forward instead of collapsing into a fixed frame.
     // Strength: defect=2 behavior=2 resilience=2 cost=1 uniqueness=2 total=9/10
     #[test]
     fn game_of_life_screen_state_rolls_forward() {
