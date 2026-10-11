@@ -108,6 +108,7 @@ enum InputAction {
 struct ScreenArgs {
     style: String,
     cell_style: GameOfLifeCellStyle,
+    symbols: bool,
     duration: Option<Duration>,
     help: bool,
 }
@@ -165,7 +166,7 @@ pub fn run_screen_cli(
         ScreenStyle::Animation(style) => {
             let timing = parsed.duration.map(|duration| (Instant::now(), duration));
             install_termination_handlers()?;
-            run_in_screen_mode(|| run_animation(style, parsed.cell_style, timing))
+            run_in_screen_mode(|| run_animation(style, parsed.cell_style, parsed.symbols, timing))
         }
     }
 }
@@ -183,12 +184,14 @@ fn parse_screen_args(
     let mut help = false;
     let mut style = None;
     let mut cell_style = GameOfLifeCellStyle::FullBlock;
+    let mut symbols = false;
     let mut duration = None;
     let mut iter = args.into_iter();
 
     while let Some(arg) = iter.next() {
         match arg.as_str() {
             "-h" | "--help" | "help" => help = true,
+            "--symbols" => symbols = true,
             "--cell-style" => {
                 let Some(raw) = iter.next() else {
                     return Err("missing value after --cell-style".into());
@@ -226,6 +229,7 @@ fn parse_screen_args(
     Ok(ScreenArgs {
         style: style.unwrap_or_else(|| "random".to_string()),
         cell_style,
+        symbols,
         duration,
         help,
     })
@@ -233,7 +237,7 @@ fn parse_screen_args(
 
 fn print_screen_help(command_name: &str) -> Result<(), String> {
     let help = format!(
-        "Show Yazelix terminal screen animations\n\nUsage:\n  {command_name} [STYLE] [--cell-style full_block|dotted] [--duration-seconds N]\n\nStyles:\n  {}\n  random\n\nNotes:\n  accelerando requires the Accelerando Terminal font (bundled in Eon)\n  asciiquarium is a compatibility alias for native aquarium (not the classic renderer)\n  Animations, including Aquarium: Left/h/p = previous; Right/l/n = next; any other key = exit\n  Static: any key = exit\n",
+        "Show Yazelix terminal screen animations\n\nUsage:\n  {command_name} [STYLE] [--symbols] [--cell-style full_block|dotted] [--duration-seconds N]\n\nStyles:\n  {}\n  random\n\nNotes:\n  accelerando uses only alien glyphs by default; --symbols mixes in letters, digits and punctuation\n  accelerando requires the Accelerando Terminal font (bundled in Eon)\n  asciiquarium is a compatibility alias for native aquarium (not the classic renderer)\n  Animations, including Aquarium: Left/h/p = previous; Right/l/n = next; any other key = exit\n  Static: any key = exit\n",
         SCREEN_STYLES.join("\n  ")
     );
     let stdout = io::stdout();
@@ -343,11 +347,12 @@ fn run_static(duration: Option<Duration>) -> Result<(), String> {
 fn run_animation(
     mut style: AnimationStyle,
     cell_style: GameOfLifeCellStyle,
+    symbols: bool,
     timing: Option<(Instant, Duration)>,
 ) -> Result<(), String> {
     let mut width = terminal_width();
     let mut height = terminal_height();
-    let mut animation = build_animation(style, width, height, cell_style);
+    let mut animation = build_animation(style, width, height, cell_style, symbols);
     let mut cadence = frame_delay(style);
     let mut frame = animation.render_frame();
     let mut card_started = Instant::now();
@@ -390,7 +395,7 @@ fn run_animation(
             Some(action @ (InputAction::Previous | InputAction::Next)) => {
                 style = browse_style(style, action);
                 (width, height) = current;
-                animation = build_animation(style, width, height, cell_style);
+                animation = build_animation(style, width, height, cell_style, symbols);
                 cadence = frame_delay(style);
                 frame = animation.render_frame();
                 card_started = Instant::now();
@@ -539,6 +544,7 @@ fn build_animation(
     width: usize,
     height: usize,
     cell_style: GameOfLifeCellStyle,
+    symbols: bool,
 ) -> Box<dyn ScreenFrameProducer> {
     let context = context_for_style(style, width, height);
     match style {
@@ -556,7 +562,7 @@ fn build_animation(
         AnimationStyle::Plasma => Box::new(PlasmaAnimation::new(context)),
         AnimationStyle::Mandelbrot => Box::new(MandelbrotAnimation::new(context)),
         AnimationStyle::Matrix(variant) => {
-            Box::new(MatrixAnimation::with_variant(context, variant))
+            Box::new(MatrixAnimation::with_variant(context, variant).with_symbols(symbols))
         }
     }
 }
@@ -915,7 +921,8 @@ mod tests {
                 AnimationStyle::Matrix(MatrixVariant::Accelerando),
                 40,
                 12,
-                GameOfLifeCellStyle::FullBlock
+                GameOfLifeCellStyle::FullBlock,
+                false
             )
             .render_frame(),
             MatrixAnimation::with_variant(full_screen_context(40, 12), MatrixVariant::Accelerando)
@@ -934,7 +941,8 @@ mod tests {
                 AnimationStyle::Aquarium,
                 40,
                 12,
-                GameOfLifeCellStyle::FullBlock
+                GameOfLifeCellStyle::FullBlock,
+                false
             )
             .render_frame(),
             AquariumAnimation::new(full_screen_context(40, 12)).render_frame()
@@ -948,7 +956,8 @@ mod tests {
                 AnimationStyle::Physarum,
                 40,
                 12,
-                GameOfLifeCellStyle::FullBlock
+                GameOfLifeCellStyle::FullBlock,
+                false
             )
             .render_frame(),
             PhysarumAnimation::new(full_screen_context(40, 12)).render_frame()
@@ -962,7 +971,8 @@ mod tests {
                 AnimationStyle::Chladni,
                 40,
                 12,
-                GameOfLifeCellStyle::FullBlock
+                GameOfLifeCellStyle::FullBlock,
+                false
             )
             .render_frame(),
             ChladniAnimation::new(full_screen_context(40, 12)).render_frame()
@@ -979,7 +989,8 @@ mod tests {
                 AnimationStyle::Plasma,
                 40,
                 12,
-                GameOfLifeCellStyle::FullBlock
+                GameOfLifeCellStyle::FullBlock,
+                false
             )
             .render_frame(),
             PlasmaAnimation::new(full_screen_context(40, 12)).render_frame()
@@ -1075,7 +1086,7 @@ mod tests {
 
     // Defends: CLI parsing keeps the package usable standalone while exposing the timed mode needed by integrated welcome.
     #[test]
-    fn parse_args_accepts_style_cell_style_and_duration() {
+    fn parse_args_accepts_style_cell_style_duration_and_symbols() {
         let parsed = parse_screen_args(
             [
                 "game_of_life_gliders".to_string(),
@@ -1092,6 +1103,41 @@ mod tests {
         assert_eq!(parsed.cell_style, GameOfLifeCellStyle::Dotted);
         assert_eq!(parsed.duration, Some(Duration::from_secs(3)));
         assert!(!parsed.help);
+        assert!(!parsed.symbols);
+
+        for symbols in [false, true] {
+            let mut args = vec!["accelerando".to_string()];
+            if symbols {
+                args.push("--symbols".to_string());
+            }
+            let parsed = parse_screen_args(args, "anima").unwrap();
+            assert_eq!(parsed.symbols, symbols);
+            let ScreenStyle::Animation(style) =
+                resolve_style(&parsed.style, None, "anima").unwrap()
+            else {
+                panic!("expected animation")
+            };
+            for style in [
+                style,
+                browse_style(
+                    browse_style(style, InputAction::Previous),
+                    InputAction::Next,
+                ),
+            ] {
+                let frame = build_animation(style, 80, 24, parsed.cell_style, parsed.symbols)
+                    .render_frame();
+                let plain = strip_ansi(&frame.join("\n"));
+                assert!(
+                    plain
+                        .chars()
+                        .any(|glyph| ('\u{100000}'..='\u{101fff}').contains(&glyph))
+                );
+                assert_eq!(
+                    plain.chars().any(|glyph| glyph.is_ascii_alphanumeric()),
+                    symbols
+                );
+            }
+        }
     }
 
     // Defends: the static card copy matches the Yazelix welcome copy and omits the main-runtime trailing prompt.

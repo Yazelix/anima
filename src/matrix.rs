@@ -41,6 +41,7 @@ struct MatrixColumn {
 pub struct MatrixAnimation {
     context: ScreenAnimationContext,
     variant: MatrixVariant,
+    symbols: bool,
     frame_index: usize,
     seed: u64,
     columns: Vec<MatrixColumn>,
@@ -60,10 +61,16 @@ impl MatrixAnimation {
         Self {
             context,
             variant,
+            symbols: false,
             frame_index: 0,
             seed,
             columns,
         }
+    }
+
+    pub fn with_symbols(mut self, symbols: bool) -> Self {
+        self.symbols = symbols;
+        self
     }
 
     fn render_accelerando(&self) -> Vec<String> {
@@ -85,7 +92,7 @@ impl MatrixAnimation {
                     .wrapping_add(age * 11);
                 let hash = matrix_glyph_hash(column.glyph_seed, x, age, mutation);
                 let tone = trail_tone(age, column.length);
-                let glyph = if (hash >> 32).is_multiple_of(4) {
+                let glyph = if self.symbols && (hash >> 32).is_multiple_of(4) {
                     matrix_glyph(column.glyph_seed, x, age, mutation)
                 } else {
                     accelerando_glyph(hash as usize)
@@ -148,7 +155,7 @@ impl ScreenFrameProducer for MatrixAnimation {
     }
 
     fn resize(&mut self, context: ScreenAnimationContext) {
-        *self = Self::with_variant(context, self.variant);
+        *self = Self::with_variant(context, self.variant).with_symbols(self.symbols);
     }
 }
 
@@ -315,11 +322,31 @@ mod tests {
                 .all(|column| (12..=36).contains(&column.length))
         );
         assert!(first.columns.iter().any(|column| column.length > 24));
-        assert!(MATRIX_GLYPHS.iter().any(|&glyph| {
+        assert_eq!(
             initial
+                .iter()
+                .flat_map(|line| line.chars())
+                .filter(|glyph| glyphs.contains(glyph))
+                .count(),
+            visible_glyphs(&initial)
+        );
+        let mut mixed = first.clone().with_symbols(true);
+        let mixed_frame = mixed.render_frame();
+        assert_ne!(mixed_frame, initial);
+        assert!(MATRIX_GLYPHS.iter().any(|&glyph| {
+            mixed_frame
                 .iter()
                 .any(|line| line.contains(&format!("m{}\u{1b}[39m", glyph as char)))
         }));
+        mixed.resize(context(80, 24));
+        assert_eq!(mixed.render_frame(), mixed_frame);
+        assert_eq!(mixed.with_symbols(false).render_frame(), initial);
+        assert_eq!(
+            MatrixAnimation::new(context(40, 12)).render_frame(),
+            MatrixAnimation::new(context(40, 12))
+                .with_symbols(true)
+                .render_frame()
+        );
         assert!(initial.join("").contains("38;5;15"));
         assert!(initial.join("").contains("38;5;28"));
         let mut shimmer = first.clone();

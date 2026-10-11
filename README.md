@@ -77,7 +77,7 @@ Run the command above a GIF to watch that style in your terminal.
 
 `anima accelerando`
 
-![Native alien glyphs and code symbols falling in long green trails with white heads](assets/animations/accelerando.gif)
+![Native alien glyphs falling in long green trails with white heads](assets/animations/accelerando.gif)
 
 ### Game of Life: Gliders
 
@@ -252,8 +252,9 @@ remains explicitly selectable but outside that pool. The library random helper
 includes all native animation families with equal family weighting.
 `matrix` and `accelerando` share the Matrix family in that helper.
 
-In `accelerando`, Accelerando-8192 alien glyphs mix with Matrix's letters,
-digits, and punctuation in long green trails with white heads and varied speeds.
+In `accelerando`, Accelerando-8192 alien glyphs fall in long green trails with
+white heads and varied speeds. The default uses only the alien alphabet;
+`anima accelerando --symbols` mixes in Matrix's letters, digits, and punctuation.
 All 8,192 glyphs use the **Accelerando Terminal** font at ordinary Matrix
 character height, with a blank column between streams. Eon bundles the font
 for its terminal surfaces. There is no substitute alphabet or activation flag.
