@@ -66,6 +66,10 @@ Special thanks to:
 - [Lode Vandevenne](https://lodev.org/cgtutor/plasma.html), who documents
   sine-sum plasma and circular palettes. Anima uses that technique with its
   own wave frequencies, motion, and colors.
+- [Jeffrey Emanuel (@doodlestein)](https://github.com/Dicklesworthstone) and
+  [FrankenTUI](https://github.com/Dicklesworthstone/frankentui), whose visual
+  effects inspired parts of Anima's mathematical animation collection,
+  including Plasma.
 
 ## User Command
 
