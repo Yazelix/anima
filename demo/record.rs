@@ -35,6 +35,7 @@ fn record(r: &mut Recorder) -> Result<()> {
         ("plasma", 4),
         ("mandelbrot", 4),
         ("matrix", 4),
+        ("accelerando", 4),
         ("game_of_life_gliders", 4),
         ("game_of_life_tumblers", 4),
     ];

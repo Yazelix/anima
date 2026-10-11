@@ -1,14 +1,15 @@
 use crate::random::system_random_index;
 use crate::{
-    AQUARIUM_STYLE, AquariumAnimation, BoidsAnimation, BoidsVariant, CHLADNI_STYLE,
-    ChladniAnimation, FRIENDS_AND_ENEMIES_STYLE, FriendsAndEnemiesAnimation,
+    ACCELERANDO_STYLE, AQUARIUM_STYLE, AquariumAnimation, BoidsAnimation, BoidsVariant,
+    CHLADNI_STYLE, ChladniAnimation, FRIENDS_AND_ENEMIES_STYLE, FriendsAndEnemiesAnimation,
     GAME_OF_LIFE_RANDOM_STYLES, GameOfLifeAnimation, GameOfLifeCellStyle, MANDELBROT_STYLE,
-    MATRIX_STYLE, MandelbrotAnimation, MatrixAnimation, PHYSARUM_STYLE, PLASMA_STYLE,
-    PRIMORDIAL_STYLE, PhysarumAnimation, PlasmaAnimation, PrimordialAnimation, RawModeGuard,
-    ScreenAnimationContext, ScreenFrameProducer, aquarium_frame_delay, center_frame_lines,
-    center_text, chladni_frame_delay, enter_screen_mode, game_of_life_spec, leave_screen_mode,
-    mandelbrot_frame_delay, matrix_frame_delay, physarum_frame_delay, plasma_frame_delay,
-    primordial_frame_delay, render_screen_frame, terminal_height, terminal_width,
+    MATRIX_STYLE, MandelbrotAnimation, MatrixAnimation, MatrixVariant, PHYSARUM_STYLE,
+    PLASMA_STYLE, PRIMORDIAL_STYLE, PhysarumAnimation, PlasmaAnimation, PrimordialAnimation,
+    RawModeGuard, ScreenAnimationContext, ScreenFrameProducer, aquarium_frame_delay,
+    center_frame_lines, center_text, chladni_frame_delay, enter_screen_mode, game_of_life_spec,
+    leave_screen_mode, mandelbrot_frame_delay, matrix_frame_delay, physarum_frame_delay,
+    plasma_frame_delay, primordial_frame_delay, render_screen_frame, terminal_height,
+    terminal_width,
 };
 use crossterm::event::{self, KeyCode, KeyEvent, KeyEventKind};
 use std::fmt::Write as _;
@@ -38,6 +39,7 @@ pub const SCREEN_STYLES: &[&str] = &[
     PLASMA_STYLE,
     MANDELBROT_STYLE,
     MATRIX_STYLE,
+    ACCELERANDO_STYLE,
     "game_of_life_gliders",
     "game_of_life_tumblers",
 ];
@@ -53,6 +55,7 @@ pub const SCREEN_RANDOM_STYLES: &[&str] = &[
     PLASMA_STYLE,
     MANDELBROT_STYLE,
     MATRIX_STYLE,
+    ACCELERANDO_STYLE,
     "game_of_life_gliders",
     "game_of_life_tumblers",
 ];
@@ -75,7 +78,7 @@ enum AnimationStyle {
     Chladni,
     Plasma,
     Mandelbrot,
-    Matrix,
+    Matrix(MatrixVariant),
 }
 
 const ANIMATION_STYLES: &[AnimationStyle] = &[
@@ -88,7 +91,8 @@ const ANIMATION_STYLES: &[AnimationStyle] = &[
     AnimationStyle::Chladni,
     AnimationStyle::Plasma,
     AnimationStyle::Mandelbrot,
-    AnimationStyle::Matrix,
+    AnimationStyle::Matrix(MatrixVariant::Classic),
+    AnimationStyle::Matrix(MatrixVariant::Accelerando),
     AnimationStyle::GameOfLife(GAME_OF_LIFE_RANDOM_STYLES[0]),
     AnimationStyle::GameOfLife(GAME_OF_LIFE_RANDOM_STYLES[1]),
 ];
@@ -284,7 +288,14 @@ fn resolve_style(
         return Ok(ScreenStyle::Animation(AnimationStyle::Plasma));
     }
     if normalized == MATRIX_STYLE {
-        return Ok(ScreenStyle::Animation(AnimationStyle::Matrix));
+        return Ok(ScreenStyle::Animation(AnimationStyle::Matrix(
+            MatrixVariant::Classic,
+        )));
+    }
+    if normalized == ACCELERANDO_STYLE {
+        return Ok(ScreenStyle::Animation(AnimationStyle::Matrix(
+            MatrixVariant::Accelerando,
+        )));
     }
     if let Some(style) = GAME_OF_LIFE_RANDOM_STYLES
         .iter()
@@ -467,7 +478,13 @@ fn animation_credit(style: AnimationStyle) -> (&'static str, &'static str) {
         AnimationStyle::Chladni => ("Chladni", "Equations documented by Paul Bourke"),
         AnimationStyle::Plasma => ("Plasma", "Technique documented by Lode Vandevenne"),
         AnimationStyle::Mandelbrot => ("Mandelbrot", "Fractal research by Benoît Mandelbrot"),
-        AnimationStyle::Matrix => ("Matrix", "Original rain design by Simon Whiteley"),
+        AnimationStyle::Matrix(MatrixVariant::Classic) => {
+            ("Matrix", "Original rain design by Simon Whiteley")
+        }
+        AnimationStyle::Matrix(MatrixVariant::Accelerando) => (
+            "Accelerando",
+            "Glyphs by gillverd; rain inspired by Simon Whiteley",
+        ),
     }
 }
 
@@ -579,7 +596,9 @@ fn build_animation(
         AnimationStyle::Chladni => Box::new(ChladniAnimation::new(context)),
         AnimationStyle::Plasma => Box::new(PlasmaAnimation::new(context)),
         AnimationStyle::Mandelbrot => Box::new(MandelbrotAnimation::new(context)),
-        AnimationStyle::Matrix => Box::new(MatrixAnimation::new(context)),
+        AnimationStyle::Matrix(variant) => {
+            Box::new(MatrixAnimation::with_variant(context, variant))
+        }
     }
 }
 
@@ -594,7 +613,7 @@ fn context_for_style(style: AnimationStyle, width: usize, height: usize) -> Scre
         | AnimationStyle::Chladni
         | AnimationStyle::Plasma
         | AnimationStyle::Mandelbrot
-        | AnimationStyle::Matrix => full_screen_context(width, height),
+        | AnimationStyle::Matrix(_) => full_screen_context(width, height),
     }
 }
 
@@ -628,7 +647,7 @@ fn frame_delay(style: AnimationStyle) -> Duration {
         AnimationStyle::Chladni => chladni_frame_delay(),
         AnimationStyle::Plasma => plasma_frame_delay(),
         AnimationStyle::Mandelbrot => mandelbrot_frame_delay(),
-        AnimationStyle::Matrix => matrix_frame_delay(),
+        AnimationStyle::Matrix(_) => matrix_frame_delay(),
         AnimationStyle::GameOfLife(_) => Duration::from_millis(160),
     }
 }
@@ -960,6 +979,23 @@ mod tests {
             assert!(resolve_style(style, None, "anima").is_ok());
         }
         assert_eq!(
+            resolve_style(" ACCELERANDO ", None, "anima"),
+            Ok(ScreenStyle::Animation(AnimationStyle::Matrix(
+                MatrixVariant::Accelerando
+            )))
+        );
+        assert_eq!(
+            build_animation(
+                AnimationStyle::Matrix(MatrixVariant::Accelerando),
+                40,
+                12,
+                GameOfLifeCellStyle::FullBlock
+            )
+            .render_frame(),
+            MatrixAnimation::with_variant(full_screen_context(40, 12), MatrixVariant::Accelerando)
+                .render_frame()
+        );
+        assert_eq!(
             resolve_style(" AQUARIUM ", None, "anima"),
             Ok(ScreenStyle::Animation(AnimationStyle::Aquarium))
         );
@@ -1090,7 +1126,8 @@ mod tests {
                 AnimationStyle::Chladni,
                 AnimationStyle::Plasma,
                 AnimationStyle::Mandelbrot,
-                AnimationStyle::Matrix,
+                AnimationStyle::Matrix(MatrixVariant::Classic),
+                AnimationStyle::Matrix(MatrixVariant::Accelerando),
                 AnimationStyle::GameOfLife(GAME_OF_LIFE_RANDOM_STYLES[0]),
                 AnimationStyle::GameOfLife(GAME_OF_LIFE_RANDOM_STYLES[1]),
             ]

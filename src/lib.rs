@@ -41,7 +41,9 @@ pub use mandelbrot::{
     MandelbrotAnimation, mandelbrot_escape_iterations, mandelbrot_frame_delay,
     mandelbrot_max_iterations,
 };
-pub use matrix::{MATRIX_STYLE, MatrixAnimation, matrix_frame_delay};
+pub use matrix::{
+    ACCELERANDO_STYLE, MATRIX_STYLE, MatrixAnimation, MatrixVariant, matrix_frame_delay,
+};
 pub use physarum::{PHYSARUM_STYLE, PhysarumAnimation, physarum_frame_delay};
 pub use plasma::{PLASMA_STYLE, PlasmaAnimation, plasma_frame_delay};
 pub use primordial::{PRIMORDIAL_STYLE, PrimordialAnimation, primordial_frame_delay};

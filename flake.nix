@@ -78,6 +78,10 @@
           ];
           doCheck = false;
 
+          postInstall = ''
+            install -Dm444 src/accelerando-glyphs.NOTICE $out/share/licenses/anima/accelerando-glyphs.NOTICE
+          '';
+
           meta = {
             description = "Anima: standalone terminal animations from Yazelix";
             homepage = "https://github.com/Yazelix/anima";

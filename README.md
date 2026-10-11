@@ -73,6 +73,12 @@ Run the command above a GIF to watch that style in your terminal.
 
 ![Green columns of glowing characters falling across the terminal](assets/animations/matrix.gif)
 
+### Accelerando
+
+`anima accelerando`
+
+![Angular alien glyphs falling in mint-green columns with bright heads and fading trails](assets/animations/accelerando.gif)
+
 ### Game of Life: Gliders
 
 `anima game_of_life_gliders`
@@ -132,7 +138,9 @@ Special thanks to:
   Mandelbrot animation.
 - [Simon Whiteley](https://www.wired.com/story/the-matrix-code-sushi-recipe/),
   who designed the digital rain for *The Matrix*. It inspires Anima's Matrix
-  animation.
+  animations.
+- [gillverd](https://github.com/gillverd/accelerando-8192), who created the
+  Accelerando-8192 alien alphabet used with permission in Accelerando.
 - [Thomas Schmickl, Martin Stefanec, and Karl Crailsheim](https://www.nature.com/articles/srep37969),
   who introduced the Primordial Particle System motion law. Anima implements
   that law in its Primordial animation.
@@ -189,6 +197,7 @@ cargo run --bin anima -- physarum --duration-seconds 3
 cargo run --bin anima -- chladni --duration-seconds 3
 cargo run --bin anima -- plasma --duration-seconds 3
 cargo run --bin anima -- mandelbrot
+cargo run --bin anima -- accelerando
 cargo run --bin anima -- game_of_life_tumblers --cell-style dotted
 cargo run --bin anima -- random --duration-seconds 3
 ```
@@ -241,6 +250,14 @@ Random chooses from all current native animations, including Aquarium,
 `friends_and_enemies`, `physarum`, `chladni`, and `plasma`. `static` and `logo`
 remain explicitly selectable but outside that pool. The library random helper
 includes all native animation families with equal family weighting.
+`matrix` and `accelerando` share the Matrix family in that helper.
+
+In `accelerando`, the Accelerando-8192 alien glyphs fall in mint-green
+columns with bright heads, fading trails, and varied speeds. All 8,192 glyphs
+retain their original orientation in embedded 7×7 bitmaps, drawn with square
+truecolor half-block pixels under the 2:1 terminal-cell convention. No custom
+font or external file is required. Glyph provenance and the maintainer-confirmed
+permission are recorded in [src/accelerando-glyphs.NOTICE](src/accelerando-glyphs.NOTICE).
 
 In `aquarium`, small schools and striped reef fish swim past swaying kelp,
 coral, rocks, and rising bubbles. A ray, a slow whale, and a faster shark take
@@ -299,6 +316,7 @@ Play a style for a bounded number of frames:
 cargo run --example play_style -- mandelbrot 90
 cargo run --example play_style -- aquarium 180
 cargo run --example play_style -- matrix 90
+cargo run --example play_style -- accelerando 90
 cargo run --example play_style -- boids_schools 120
 cargo run --example play_style -- friends_and_enemies 90
 cargo run --example play_style -- primordial 180

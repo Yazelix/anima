@@ -58,6 +58,7 @@ fn closing_the_terminal_exits_timed_and_interactive_playback() {
         "aquarium",
         "asciiquarium",
         "boids_predator",
+        "accelerando",
         "static",
         "logo",
     ] {

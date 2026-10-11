@@ -1,11 +1,11 @@
 use std::{io, thread, time::Duration};
 
 use yazelix_screen::{
-    AQUARIUM_STYLE, AquariumAnimation, BoidsAnimation, BoidsVariant, CHLADNI_STYLE,
-    ChladniAnimation, FRIENDS_AND_ENEMIES_STYLE, FriendsAndEnemiesAnimation,
+    ACCELERANDO_STYLE, AQUARIUM_STYLE, AquariumAnimation, BoidsAnimation, BoidsVariant,
+    CHLADNI_STYLE, ChladniAnimation, FRIENDS_AND_ENEMIES_STYLE, FriendsAndEnemiesAnimation,
     GAME_OF_LIFE_RANDOM_STYLES, GameOfLifeAnimation, GameOfLifeCellStyle, MANDELBROT_STYLE,
-    MATRIX_STYLE, MandelbrotAnimation, MatrixAnimation, PHYSARUM_STYLE, PLASMA_STYLE,
-    PRIMORDIAL_STYLE, PhysarumAnimation, PlasmaAnimation, PrimordialAnimation,
+    MATRIX_STYLE, MandelbrotAnimation, MatrixAnimation, MatrixVariant, PHYSARUM_STYLE,
+    PLASMA_STYLE, PRIMORDIAL_STYLE, PhysarumAnimation, PlasmaAnimation, PrimordialAnimation,
     ScreenAnimationContext, ScreenFrameProducer, aquarium_frame_delay, chladni_frame_delay,
     enter_screen_mode, game_of_life_spec, leave_screen_mode, mandelbrot_frame_delay,
     matrix_frame_delay, physarum_frame_delay, plasma_frame_delay, primordial_frame_delay,
@@ -19,7 +19,7 @@ enum ExampleStyle {
     FriendsAndEnemies,
     GameOfLife(&'static str),
     Mandelbrot,
-    Matrix,
+    Matrix(MatrixVariant),
     Primordial,
     Physarum,
     Chladni,
@@ -78,7 +78,10 @@ fn resolve_style(raw: &str) -> Result<ExampleStyle, io::Error> {
         return Ok(ExampleStyle::Mandelbrot);
     }
     if normalized == MATRIX_STYLE {
-        return Ok(ExampleStyle::Matrix);
+        return Ok(ExampleStyle::Matrix(MatrixVariant::Classic));
+    }
+    if normalized == ACCELERANDO_STYLE {
+        return Ok(ExampleStyle::Matrix(MatrixVariant::Accelerando));
     }
     if normalized == PRIMORDIAL_STYLE {
         return Ok(ExampleStyle::Primordial);
@@ -103,7 +106,7 @@ fn resolve_style(raw: &str) -> Result<ExampleStyle, io::Error> {
     Err(io::Error::new(
         io::ErrorKind::InvalidInput,
         format!(
-            "unsupported style `{normalized}`; expected aquarium, boids, boids_predator, boids_schools, friends_and_enemies, primordial, physarum, chladni, plasma, mandelbrot, matrix, game_of_life_gliders, or game_of_life_tumblers"
+            "unsupported style `{normalized}`; expected aquarium, boids, boids_predator, boids_schools, friends_and_enemies, primordial, physarum, chladni, plasma, mandelbrot, matrix, accelerando, game_of_life_gliders, or game_of_life_tumblers"
         ),
     ))
 }
@@ -124,7 +127,7 @@ fn build_animation(style: ExampleStyle) -> Box<dyn ScreenFrameProducer> {
         )),
         ExampleStyle::FriendsAndEnemies => Box::new(FriendsAndEnemiesAnimation::new(context)),
         ExampleStyle::Mandelbrot => Box::new(MandelbrotAnimation::new(context)),
-        ExampleStyle::Matrix => Box::new(MatrixAnimation::new(context)),
+        ExampleStyle::Matrix(variant) => Box::new(MatrixAnimation::with_variant(context, variant)),
         ExampleStyle::Primordial => Box::new(PrimordialAnimation::new(context)),
         ExampleStyle::Physarum => Box::new(PhysarumAnimation::new(context)),
         ExampleStyle::Chladni => Box::new(ChladniAnimation::new(context)),
@@ -147,7 +150,7 @@ fn context_for_style(style: ExampleStyle, width: usize, height: usize) -> Screen
         | ExampleStyle::Chladni
         | ExampleStyle::Plasma
         | ExampleStyle::Mandelbrot
-        | ExampleStyle::Matrix => width,
+        | ExampleStyle::Matrix(_) => width,
     };
 
     ScreenAnimationContext {
@@ -176,7 +179,7 @@ fn frame_delay(style: ExampleStyle) -> Duration {
         ExampleStyle::Boids(_) => Duration::from_millis(70),
         ExampleStyle::FriendsAndEnemies => Duration::from_millis(55),
         ExampleStyle::Mandelbrot => mandelbrot_frame_delay(),
-        ExampleStyle::Matrix => matrix_frame_delay(),
+        ExampleStyle::Matrix(_) => matrix_frame_delay(),
         ExampleStyle::Primordial => primordial_frame_delay(),
         ExampleStyle::Physarum => physarum_frame_delay(),
         ExampleStyle::Chladni => chladni_frame_delay(),

@@ -1,12 +1,50 @@
 use std::time::Duration;
 
 use crate::random::{seeded_index, size_seed};
-use crate::{ScreenAnimationContext, ScreenCell, ScreenFrame, ScreenFrameProducer};
+use crate::{
+    HalfBlockField, RgbColor, ScreenAnimationContext, ScreenCell, ScreenFrame, ScreenFrameProducer,
+};
 use crossterm::style::Color;
 
 pub const MATRIX_STYLE: &str = "matrix";
+pub const ACCELERANDO_STYLE: &str = "accelerando";
 
 const MATRIX_GLYPHS: &[u8] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ@#$%&*+=-:;.";
+const ACCELERANDO_GLYPHS: &[u8; 8192 * 8] = include_bytes!("accelerando-glyphs.bin");
+const GLYPH_PITCH: usize = 9;
+const RAIN_COLORS: [RgbColor; 6] = [
+    RgbColor::new(205, 255, 224),
+    RgbColor::new(142, 230, 176),
+    RgbColor::new(72, 184, 126),
+    RgbColor::new(38, 130, 72),
+    RgbColor::new(20, 83, 48),
+    RgbColor::new(8, 37, 20),
+];
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MatrixVariant {
+    Classic,
+    Accelerando,
+}
+
+impl MatrixVariant {
+    fn dimensions(self, context: ScreenAnimationContext) -> (usize, usize) {
+        match self {
+            Self::Classic => (context.inner_width, context.resolved_height),
+            Self::Accelerando => (
+                context.inner_width.div_ceil(GLYPH_PITCH),
+                context.resolved_height.saturating_mul(2),
+            ),
+        }
+    }
+
+    fn pitch(self) -> usize {
+        match self {
+            Self::Classic => 1,
+            Self::Accelerando => GLYPH_PITCH,
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct MatrixColumn {
@@ -20,6 +58,7 @@ struct MatrixColumn {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MatrixAnimation {
     context: ScreenAnimationContext,
+    variant: MatrixVariant,
     frame_index: usize,
     seed: u64,
     columns: Vec<MatrixColumn>,
@@ -27,25 +66,55 @@ pub struct MatrixAnimation {
 
 impl MatrixAnimation {
     pub fn new(context: ScreenAnimationContext) -> Self {
-        let mut seed = size_seed(
-            context.inner_width,
-            context.resolved_height,
-            0x4D41_5452_4958,
-        );
-        let columns = (0..context.inner_width)
-            .map(|_| new_column(&mut seed, context.resolved_height, true))
+        Self::with_variant(context, MatrixVariant::Classic)
+    }
+
+    pub fn with_variant(context: ScreenAnimationContext, variant: MatrixVariant) -> Self {
+        let (width, height) = variant.dimensions(context);
+        let mut seed = size_seed(width, height, 0x4D41_5452_4958);
+        let columns = (0..width)
+            .map(|_| new_column(&mut seed, height, true, variant.pitch()))
             .collect();
         Self {
             context,
+            variant,
             frame_index: 0,
             seed,
             columns,
         }
     }
+
+    fn render_accelerando(&self) -> Vec<String> {
+        let width = self.context.inner_width;
+        let (_, height) = self.variant.dimensions(self.context);
+        let mut pixels = HalfBlockField::new(width, height);
+        for y in 0..height {
+            for x in 0..width {
+                pixels.set(x, y, Some(RgbColor::new(0, 0, 0)));
+            }
+        }
+        for (x, column) in self.columns.iter().enumerate() {
+            for age in 0..column.length {
+                let top = column.head - (age * GLYPH_PITCH) as i32;
+                let mutation = self
+                    .frame_index
+                    .wrapping_add(x.wrapping_mul(17))
+                    .wrapping_add(age * 11)
+                    / 24;
+                let id = matrix_glyph_hash(column.glyph_seed, x, age, mutation) as usize % 8192;
+                let color = RAIN_COLORS[age * RAIN_COLORS.len() / column.length];
+                paint_accelerando_glyph(&mut pixels, id, x * GLYPH_PITCH, top, color);
+            }
+        }
+        pixels.render_lines(self.context.resolved_width)
+    }
 }
 
 impl ScreenFrameProducer for MatrixAnimation {
     fn render_frame(&self) -> Vec<String> {
+        if self.variant == MatrixVariant::Accelerando {
+            return self.render_accelerando();
+        }
         let width = self.context.inner_width;
         let height = self.context.resolved_height;
         let mut frame = ScreenFrame::new(width, height);
@@ -72,7 +141,8 @@ impl ScreenFrameProducer for MatrixAnimation {
 
     fn advance_frame(&mut self) {
         self.frame_index = self.frame_index.wrapping_add(1);
-        let height = self.context.resolved_height;
+        let (_, height) = self.variant.dimensions(self.context);
+        let pitch = self.variant.pitch();
         for column in &mut self.columns {
             if self
                 .frame_index
@@ -81,14 +151,14 @@ impl ScreenFrameProducer for MatrixAnimation {
             {
                 column.head += 1;
             }
-            if column.head as i64 - column.length as i64 >= height as i64 {
-                *column = new_column(&mut self.seed, height, false);
+            if column.head as i64 - (column.length * pitch) as i64 >= height as i64 {
+                *column = new_column(&mut self.seed, height, false, pitch);
             }
         }
     }
 
     fn resize(&mut self, context: ScreenAnimationContext) {
-        *self = Self::new(context);
+        *self = Self::with_variant(context, self.variant);
     }
 }
 
@@ -96,9 +166,9 @@ pub fn matrix_frame_delay() -> Duration {
     Duration::from_millis(55)
 }
 
-fn new_column(seed: &mut u64, height: usize, warm: bool) -> MatrixColumn {
-    let minimum_length = height.clamp(1, 4);
-    let maximum_length = (height.saturating_mul(2) / 3).clamp(minimum_length, 24);
+fn new_column(seed: &mut u64, height: usize, warm: bool, pitch: usize) -> MatrixColumn {
+    let minimum_length = (height / pitch).clamp(1, 4);
+    let maximum_length = (height.saturating_mul(2) / 3 / pitch).clamp(minimum_length, 24);
     let length = minimum_length + seeded_index(seed, maximum_length - minimum_length + 1);
     let speed = 1 + seeded_index(seed, 3);
     let head = if warm {
@@ -121,6 +191,11 @@ fn trail_tone(age: usize, length: usize) -> usize {
 }
 
 fn matrix_glyph(seed: u64, x: usize, y: usize, frame_index: usize) -> char {
+    MATRIX_GLYPHS[(matrix_glyph_hash(seed, x, y, frame_index) as usize) % MATRIX_GLYPHS.len()]
+        as char
+}
+
+fn matrix_glyph_hash(seed: u64, x: usize, y: usize, frame_index: usize) -> u64 {
     let mut hash = seed
         ^ (x as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)
         ^ (y as u64).wrapping_mul(0xBF58_476D_1CE4_E5B9)
@@ -128,7 +203,35 @@ fn matrix_glyph(seed: u64, x: usize, y: usize, frame_index: usize) -> char {
     hash ^= hash >> 30;
     hash = hash.wrapping_mul(0xBF58_476D_1CE4_E5B9);
     hash ^= hash >> 27;
-    MATRIX_GLYPHS[(hash as usize) % MATRIX_GLYPHS.len()] as char
+    hash
+}
+
+fn accelerando_bitmap(id: usize) -> u64 {
+    u64::from_le_bytes(ACCELERANDO_GLYPHS[id * 8..(id + 1) * 8].try_into().unwrap())
+}
+
+fn paint_accelerando_glyph(
+    pixels: &mut HalfBlockField,
+    id: usize,
+    left: usize,
+    top: i32,
+    color: RgbColor,
+) {
+    let bits = accelerando_bitmap(id);
+    for y in 0..7 {
+        if top + y < 0 {
+            continue;
+        }
+        for x in 0..7 {
+            if bits & (1 << (y * 7 + x)) != 0 {
+                pixels.set(
+                    left.saturating_add(x as usize),
+                    (top + y) as usize,
+                    Some(color),
+                );
+            }
+        }
+    }
 }
 
 fn colorize_matrix_cell(cell: ScreenCell) -> String {
@@ -199,6 +302,57 @@ mod tests {
         first.frame_index = usize::MAX - 1;
         first.advance_frame();
         assert_eq!(first.frame_index, usize::MAX);
+    }
+
+    #[test]
+    fn accelerando_preserves_glyphs_and_renders_bounded_moving_rain() {
+        let bitmaps: std::collections::HashSet<_> = (0..8192).map(accelerando_bitmap).collect();
+        assert_eq!(bitmaps.len(), 8192);
+        assert!(bitmaps.iter().all(|&bits| bits > 0 && bits < (1 << 49)));
+        // Glyph zero joins top-right to center, then left-center to bottom-left.
+        let glyph = accelerando_bitmap(0);
+        for (x, y) in [(6, 0), (5, 1), (4, 2), (3, 3), (0, 3), (0, 6)] {
+            assert_ne!(glyph & (1 << (y * 7 + x)), 0);
+        }
+        for (x, y) in [(0, 0), (6, 6)] {
+            assert_eq!(glyph & (1 << (y * 7 + x)), 0);
+        }
+
+        let color = RgbColor::new(200, 255, 220);
+        let mut clipped = HalfBlockField::new(1, 1);
+        paint_accelerando_glyph(&mut clipped, 0, 0, -6, color);
+        assert!(clipped.render_lines(1)[0].contains("200;255;220"));
+        paint_accelerando_glyph(&mut clipped, 0, usize::MAX, -6, color);
+
+        let mut first = MatrixAnimation::with_variant(context(80, 24), MatrixVariant::Accelerando);
+        let mut second = first.clone();
+        let initial = first.render_frame();
+        assert_eq!(first.columns.len(), 9);
+        assert!(initial.join("").contains("205;255;224"));
+        assert!(initial.join("").contains("20;83;48"));
+        for _ in 0..360 {
+            first.advance_frame();
+            second.advance_frame();
+            assert!(first.columns.iter().all(|column| column.length <= 24));
+        }
+        assert_eq!(first, second);
+        assert_ne!(first.render_frame(), initial);
+
+        for (width, height) in [(0, 0), (0, 7), (9, 0), (1, 1), (17, 5), (80, 24)] {
+            first.resize(context(width, height));
+            first.advance_frame();
+            let frame = first.render_frame();
+            if width == 0 || height == 0 {
+                assert!(frame.is_empty());
+            } else {
+                assert_eq!(frame.len(), height);
+                assert!(frame.iter().all(|line| visible_line_width(line) == width));
+            }
+            assert_eq!(first.variant, MatrixVariant::Accelerando);
+        }
+        first.frame_index = usize::MAX;
+        first.advance_frame();
+        assert_eq!(first.frame_index, 0);
     }
 
     fn visible_glyphs(frame: &[String]) -> usize {
