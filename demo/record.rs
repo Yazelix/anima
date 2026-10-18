@@ -84,7 +84,7 @@ fn record(r: &mut Recorder) -> Result<()> {
         .skip(1)
         .take_while(|line| !line.is_empty())
         .map(str::trim)
-        .filter(|style| !["static", "boids", "random"].contains(style));
+        .filter(|style| !["boids", "random"].contains(style));
     if !listed.eq(styles.iter().map(|(style, _)| *style)) {
         return Err(Error::Invalid(
             "update the gallery recipe and README to match packaged anima styles".into(),

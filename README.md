@@ -98,7 +98,6 @@ the default Nix entry points select the same executable.
 
 ```bash
 nix run github:Yazelix/anima#anima
-nix run github:Yazelix/anima#anima -- static
 nix run github:Yazelix/anima#anima -- aquarium --duration-seconds 3
 nix run github:Yazelix/anima#anima -- mandelbrot
 nix run github:Yazelix/anima#anima -- friends_and_enemies
@@ -113,7 +112,6 @@ nix run github:Yazelix/anima#anima -- random --duration-seconds 3
 ## What It Contains
 
 - Native animation engines for Aquarium, Boids, friends and enemies, Primordial Particle Systems, Physarum trail networks, Chladni nodal patterns, Plasma interference, Mandelbrot, Matrix rain, and Game of Life
-- A static Yazelix welcome screen
 - File-backed Kitty PNG frame sequence rendering
 - Frame production through `ScreenFrameProducer`
 - Terminal sizing helpers and alternate-screen rendering helpers
@@ -163,7 +161,6 @@ Installed standalone command:
 ```bash
 anima --help
 anima
-anima static
 anima aquarium --duration-seconds 3
 anima friends_and_enemies --duration-seconds 3
 anima primordial --duration-seconds 3
@@ -189,7 +186,6 @@ From this repository:
 
 ```bash
 cargo run --bin anima -- --help
-cargo run --bin anima -- static
 cargo run --bin anima -- aquarium --duration-seconds 3
 cargo run --bin anima -- friends_and_enemies --duration-seconds 3
 cargo run --bin anima -- primordial --duration-seconds 3
@@ -211,7 +207,6 @@ With Nix:
 ```bash
 nix build .#anima
 nix run .#anima -- --help
-nix run .#anima -- static
 nix run .#anima -- aquarium --duration-seconds 3
 nix run .#anima -- friends_and_enemies --duration-seconds 3
 nix run .#anima -- primordial --duration-seconds 3
@@ -223,8 +218,7 @@ nix run .#anima -- random --duration-seconds 3
 ```
 
 The [gallery](#animation-gallery) shows every distinct animation. `boids` is an
-alias of `boids_predator`. `static` shows a still welcome card; `random` chooses
-an animation. No style means `random`
+alias of `boids_predator`; `random` chooses an animation. No style means `random`.
 
 In animations, including Aquarium, `Left`/`h`/`p` selects the previous style and
 `Right`/`l`/`n` selects the next; any other key exits. Aquarium, then
@@ -239,7 +233,7 @@ switching does not extend the session. The RGB fade uses an opaque black
 backing inside the border for contrast; border cells use the terminal's normal
 background so the fill does not extend outside the rounded outline.
 Credits wrap in narrow terminals; the card stays hidden
-if the complete text cannot fit. `static` does not use this card.
+if the complete text cannot fit.
 Library frame producers return animation-only frames
 
 Native playback replaces rows without first clearing the entire screen. Each
@@ -247,8 +241,7 @@ frame and identity card share one synchronized update. On Unix, playback exits
 when its input terminal closes, including closures that send no signal.
 
 Random chooses from all current native animations, including Aquarium,
-`friends_and_enemies`, `physarum`, `chladni`, and `plasma`. `static`
-remains explicitly selectable but outside that pool. The library random helper
+`friends_and_enemies`, `physarum`, `chladni`, and `plasma`. The library random helper
 includes all native animation families with equal family weighting.
 `matrix` and `accelerando` share the Matrix family in that helper.
 `--exclude STYLE` removes an animation from CLI random selection and arrow
@@ -407,8 +400,8 @@ configuration is [demo/rio/config.toml](demo/rio/config.toml), and the recipe
 stops if Nova Rio rejects it. It checks its inventory against packaged CLI help
 and prints each GIF's byte size and the gallery total. When adding an animation,
 update the recipe and gallery together, inspect the motion and framing, and
-review asset sizes before committing. `boids` shares the predator GIF; `static` and `random`
-do not need separate previews.
+review asset sizes before committing. `boids` shares the predator GIF; `random` does not need a
+separate preview.
 
 Nix compiles the recipe against the pinned Kinestra library. Intermediate MP4s
 stay in ignored `demo/.work/`. Recording tools and gallery assets stay outside

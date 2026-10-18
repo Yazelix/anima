@@ -6,10 +6,9 @@ use crate::{
     MATRIX_STYLE, MandelbrotAnimation, MatrixAnimation, MatrixVariant, PHYSARUM_STYLE,
     PLASMA_STYLE, PRIMORDIAL_STYLE, PhysarumAnimation, PlasmaAnimation, PrimordialAnimation,
     RawModeGuard, ScreenAnimationContext, ScreenFrameProducer, aquarium_frame_delay,
-    center_frame_lines, center_text, chladni_frame_delay, enter_screen_mode, game_of_life_spec,
-    leave_screen_mode, mandelbrot_frame_delay, matrix_frame_delay, physarum_frame_delay,
-    plasma_frame_delay, primordial_frame_delay, render_screen_frame, terminal_height,
-    terminal_width,
+    chladni_frame_delay, enter_screen_mode, game_of_life_spec, leave_screen_mode,
+    mandelbrot_frame_delay, matrix_frame_delay, physarum_frame_delay, plasma_frame_delay,
+    primordial_frame_delay, terminal_height, terminal_width,
 };
 use crossterm::event::{self, KeyCode, KeyEvent, KeyEventKind};
 use std::fmt::Write as _;
@@ -23,9 +22,7 @@ use std::time::{Duration, Instant};
 
 /// Compatibility spelling for the native Aquarium.
 pub const ASCIQUARIUM_STYLE: &str = "asciiquarium";
-pub const STATIC_STYLE: &str = "static";
 pub const SCREEN_STYLES: &[&str] = &[
-    STATIC_STYLE,
     AQUARIUM_STYLE,
     "boids",
     "boids_predator",
@@ -41,28 +38,7 @@ pub const SCREEN_STYLES: &[&str] = &[
     "game_of_life_gliders",
     "game_of_life_tumblers",
 ];
-pub const SCREEN_RANDOM_STYLES: &[&str] = &[
-    AQUARIUM_STYLE,
-    "boids",
-    "boids_predator",
-    "boids_schools",
-    FRIENDS_AND_ENEMIES_STYLE,
-    PRIMORDIAL_STYLE,
-    PHYSARUM_STYLE,
-    CHLADNI_STYLE,
-    PLASMA_STYLE,
-    MANDELBROT_STYLE,
-    MATRIX_STYLE,
-    ACCELERANDO_STYLE,
-    "game_of_life_gliders",
-    "game_of_life_tumblers",
-];
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ScreenStyle {
-    Static,
-    Animation(AnimationStyle),
-}
+pub const SCREEN_RANDOM_STYLES: &[&str] = SCREEN_STYLES;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum AnimationStyle {
@@ -164,24 +140,20 @@ pub fn run_screen_cli(
         return Ok(());
     }
 
-    match resolve_style(&parsed.style, None, command_name, &parsed.excluded)? {
-        ScreenStyle::Static => run_in_screen_mode(|| run_static(parsed.duration)),
-        ScreenStyle::Animation(style) => {
-            let timing = parsed.duration.map(|duration| (Instant::now(), duration));
-            install_termination_handlers()?;
-            run_in_screen_mode(|| {
-                run_animation(
-                    style,
-                    parsed.cell_style,
-                    parsed.symbols,
-                    parsed.big,
-                    parsed.bold,
-                    &parsed.excluded,
-                    timing,
-                )
-            })
-        }
-    }
+    let style = resolve_style(&parsed.style, None, command_name, &parsed.excluded)?;
+    let timing = parsed.duration.map(|duration| (Instant::now(), duration));
+    install_termination_handlers()?;
+    run_in_screen_mode(|| {
+        run_animation(
+            style,
+            parsed.cell_style,
+            parsed.symbols,
+            parsed.big,
+            parsed.bold,
+            &parsed.excluded,
+            timing,
+        )
+    })
 }
 
 fn run_in_screen_mode(run: impl FnOnce() -> Result<(), String>) -> Result<(), String> {
@@ -240,11 +212,7 @@ fn parse_screen_args(
                     return Err("missing value after --exclude".into());
                 };
                 match resolve_style(&raw, None, command_name, &[]) {
-                    Ok(ScreenStyle::Animation(style))
-                        if !raw.trim().eq_ignore_ascii_case("random") =>
-                    {
-                        excluded.push(style)
-                    }
+                    Ok(style) if !raw.trim().eq_ignore_ascii_case("random") => excluded.push(style),
                     _ => {
                         return Err(format!(
                             "invalid --exclude value `{raw}`. Expected an animation style"
@@ -275,7 +243,7 @@ fn parse_screen_args(
 
 fn print_screen_help(command_name: &str) -> Result<(), String> {
     let help = format!(
-        "Show Yazelix terminal screen animations\n\nUsage:\n  {command_name} [STYLE] [--big] [--bold] [--symbols] [--cell-style full_block|dotted] [--duration-seconds N] [--exclude STYLE]...\n\nStyles:\n  {}\n  random\n\nNotes:\n  accelerando uses only alien glyphs by default; --symbols mixes in letters, digits and punctuation\n  --big draws accelerando as large solid-block glyphs without changing terminal font size\n  --bold requests bold accelerando text at either size\n  normal accelerando requires the Accelerando Terminal font (bundled in Eon)\n  --exclude removes an animation from random selection and browsing; repeat it for more\n  asciiquarium is a compatibility alias for native aquarium (not the classic renderer)\n  Animations, including Aquarium: Left/h/p = previous; Right/l/n = next; any other key = exit\n  Static: any key = exit\n",
+        "Show Yazelix terminal screen animations\n\nUsage:\n  {command_name} [STYLE] [--big] [--bold] [--symbols] [--cell-style full_block|dotted] [--duration-seconds N] [--exclude STYLE]...\n\nStyles:\n  {}\n  random\n\nNotes:\n  accelerando uses only alien glyphs by default; --symbols mixes in letters, digits and punctuation\n  --big draws accelerando as large solid-block glyphs without changing terminal font size\n  --bold requests bold accelerando text at either size\n  normal accelerando requires the Accelerando Terminal font (bundled in Eon)\n  --exclude removes an animation from random selection and browsing; repeat it for more\n  asciiquarium is a compatibility alias for native aquarium (not the classic renderer)\n  Animations, including Aquarium: Left/h/p = previous; Right/l/n = next; any other key = exit\n",
         SCREEN_STYLES.join("\n  ")
     );
     let stdout = io::stdout();
@@ -291,56 +259,49 @@ fn resolve_style(
     random_index: Option<usize>,
     command_name: &str,
     excluded: &[AnimationStyle],
-) -> Result<ScreenStyle, String> {
+) -> Result<AnimationStyle, String> {
     let normalized = raw.trim().to_ascii_lowercase();
     if normalized == "random" {
         let style = random_screen_style(random_index, excluded)
             .ok_or("--exclude removed every random animation")?;
         return resolve_style(style, None, command_name, &[]);
     }
-    if normalized == STATIC_STYLE {
-        return Ok(ScreenStyle::Static);
-    }
     if normalized == AQUARIUM_STYLE || normalized == ASCIQUARIUM_STYLE {
-        return Ok(ScreenStyle::Animation(AnimationStyle::Aquarium));
+        return Ok(AnimationStyle::Aquarium);
     }
     if let Some(variant) = BoidsVariant::from_style_name(&normalized) {
-        return Ok(ScreenStyle::Animation(AnimationStyle::Boids(variant)));
+        return Ok(AnimationStyle::Boids(variant));
     }
     if normalized == MANDELBROT_STYLE {
-        return Ok(ScreenStyle::Animation(AnimationStyle::Mandelbrot));
+        return Ok(AnimationStyle::Mandelbrot);
     }
     if normalized == FRIENDS_AND_ENEMIES_STYLE {
-        return Ok(ScreenStyle::Animation(AnimationStyle::FriendsAndEnemies));
+        return Ok(AnimationStyle::FriendsAndEnemies);
     }
     if normalized == PRIMORDIAL_STYLE {
-        return Ok(ScreenStyle::Animation(AnimationStyle::Primordial));
+        return Ok(AnimationStyle::Primordial);
     }
     if normalized == PHYSARUM_STYLE {
-        return Ok(ScreenStyle::Animation(AnimationStyle::Physarum));
+        return Ok(AnimationStyle::Physarum);
     }
     if normalized == CHLADNI_STYLE {
-        return Ok(ScreenStyle::Animation(AnimationStyle::Chladni));
+        return Ok(AnimationStyle::Chladni);
     }
     if normalized == PLASMA_STYLE {
-        return Ok(ScreenStyle::Animation(AnimationStyle::Plasma));
+        return Ok(AnimationStyle::Plasma);
     }
     if normalized == MATRIX_STYLE {
-        return Ok(ScreenStyle::Animation(AnimationStyle::Matrix(
-            MatrixVariant::Classic,
-        )));
+        return Ok(AnimationStyle::Matrix(MatrixVariant::Classic));
     }
     if normalized == ACCELERANDO_STYLE {
-        return Ok(ScreenStyle::Animation(AnimationStyle::Matrix(
-            MatrixVariant::Accelerando,
-        )));
+        return Ok(AnimationStyle::Matrix(MatrixVariant::Accelerando));
     }
     if let Some(style) = GAME_OF_LIFE_RANDOM_STYLES
         .iter()
         .find(|candidate| **candidate == normalized)
         .copied()
     {
-        return Ok(ScreenStyle::Animation(AnimationStyle::GameOfLife(style)));
+        return Ok(AnimationStyle::GameOfLife(style));
     }
 
     Err(format!(
@@ -357,7 +318,7 @@ fn random_screen_style(
         .copied()
         .filter(|style| {
             !matches!(resolve_style(style, None, "", &[]),
-                Ok(ScreenStyle::Animation(style)) if excluded.contains(&style))
+                Ok(style) if excluded.contains(&style))
         })
         .collect();
     let index = random_index.unwrap_or_else(|| system_random_index(pool.len()));
@@ -374,26 +335,6 @@ fn remaining(timing: Option<(Instant, Duration)>) -> Option<Duration> {
         return Some(Duration::ZERO);
     }
     timing.map(|(started, duration)| duration.saturating_sub(started.elapsed()))
-}
-
-fn run_static(duration: Option<Duration>) -> Result<(), String> {
-    let mut width = terminal_width();
-    let mut height = terminal_height();
-    render_centered_static(width, height)?;
-    if let Some(duration) = duration {
-        return wait_for_duration(duration);
-    }
-
-    loop {
-        if poll_for_input(Duration::from_millis(250))?.is_some() {
-            return Ok(());
-        }
-        let current = (terminal_width(), terminal_height());
-        if current != (width, height) {
-            (width, height) = current;
-            render_centered_static(width, height)?;
-        }
-    }
 }
 
 fn run_animation(
@@ -583,17 +524,6 @@ fn identity_card(style: AnimationStyle, width: usize, height: usize, intensity: 
     output
 }
 
-fn wait_for_duration(duration: Duration) -> Result<(), String> {
-    let started = Instant::now();
-    while started.elapsed() < duration {
-        let remaining = duration.saturating_sub(started.elapsed());
-        if poll_for_input(Duration::from_millis(100).min(remaining))?.is_some() {
-            break;
-        }
-    }
-    Ok(())
-}
-
 fn build_animation(
     style: AnimationStyle,
     width: usize,
@@ -714,7 +644,7 @@ fn poll_for_input(timeout: Duration) -> Result<Option<InputAction>, String> {
     let poll_interval = Duration::from_millis(50);
 
     loop {
-        // Long static waits must still notice terminal loss and shutdown.
+        // Long input waits must still notice terminal loss and shutdown.
         let ready = event::poll(wait.min(poll_interval))
             .map_err(|error| format!("could not poll terminal input: {error}"))?;
         if remaining(None) == Some(Duration::ZERO) || (had_terminal && !io::stdin().is_terminal()) {
@@ -739,87 +669,6 @@ fn poll_for_input(timeout: Duration) -> Result<Option<InputAction>, String> {
     }
 }
 
-fn render_centered_static(width: usize, height: usize) -> Result<(), String> {
-    render_screen_frame(&center_vertically(static_card(width), height))
-        .map_err(|error| format!("could not render static welcome: {error}"))
-}
-
-fn static_card(width: usize) -> Vec<String> {
-    let spec = WelcomeSpec::for_width(width);
-    let content_width = spec.inner_width + 2;
-    let mut lines = vec![
-        magenta(format!("╭{}╮", "─".repeat(spec.inner_width))),
-        colorize_title(&center_text("YAZELIX", content_width)),
-    ];
-    for body in spec.body {
-        let line = if spec.center_body {
-            center_text(body, content_width)
-        } else {
-            format!("{body:<content_width$}")
-        };
-        lines.push(colorize_body(&line));
-    }
-    lines.push(yellow(center_text("welcome to yazelix", content_width)));
-    lines.push(magenta(format!("╰{}╯", "─".repeat(spec.inner_width))));
-    center_frame_lines(lines, width)
-}
-
-fn center_vertically(lines: Vec<String>, height: usize) -> Vec<String> {
-    let top = height.saturating_sub(lines.len()) / 2;
-    let mut out = vec![String::new(); top];
-    out.extend(lines);
-    out
-}
-
-#[derive(Debug, Clone, Copy)]
-struct WelcomeSpec {
-    inner_width: usize,
-    center_body: bool,
-    body: &'static [&'static str],
-}
-
-impl WelcomeSpec {
-    fn for_width(width: usize) -> Self {
-        match size_class(width) {
-            "narrow" => Self {
-                inner_width: 22,
-                center_body: false,
-                body: &["yazi zellij helix", "one shell. one flow."],
-            },
-            "medium" => Self {
-                inner_width: 34,
-                center_body: false,
-                body: &[
-                    "your reproducible terminal IDE",
-                    "zero-conflict helix/zellij keys",
-                    "top terminals, shells, and packs",
-                ],
-            },
-            "wide" => Self {
-                inner_width: 58,
-                center_body: true,
-                body: &[
-                    "your reproducible, declarative terminal IDE",
-                    "zero-conflict keybindings between helix and zellij",
-                    "supports all top terminals and shells",
-                    "curated program packs (all configurable)",
-                ],
-            },
-            _ => Self {
-                inner_width: 58,
-                center_body: true,
-                body: &[
-                    "your reproducible, declarative terminal IDE",
-                    "zero-conflict keybindings between helix and zellij",
-                    "supports all top terminals and shells",
-                    "curated program packs (all configurable)",
-                    "shines over SSH",
-                ],
-            },
-        }
-    }
-}
-
 fn size_class(width: usize) -> &'static str {
     if width < 44 {
         "narrow"
@@ -830,66 +679,6 @@ fn size_class(width: usize) -> &'static str {
     } else {
         "hero"
     }
-}
-
-fn colorize_title(text: &str) -> String {
-    const COLORS: &[&str] = &["31", "32", "33", "34", "35"];
-    text.chars()
-        .enumerate()
-        .map(|(index, ch)| {
-            if ch == ' ' {
-                " ".to_string()
-            } else {
-                ansi(COLORS[index % COLORS.len()], ch.to_string())
-            }
-        })
-        .collect()
-}
-
-fn colorize_body(text: &str) -> String {
-    let mut out = String::new();
-    let mut remaining = text;
-    let accents = [
-        "reproducible",
-        "declarative",
-        "helix",
-        "zellij",
-        "terminals",
-        "shells",
-        "packs",
-        "SSH",
-    ];
-    while let Some((index, accent)) = accents
-        .iter()
-        .filter_map(|&accent| remaining.find(accent).map(|index| (index, accent)))
-        .min_by_key(|(index, _)| *index)
-    {
-        out.push_str(&green(&remaining[..index]));
-        out.push_str(&blue(accent));
-        remaining = &remaining[index + accent.len()..];
-    }
-    out.push_str(&green(remaining));
-    out
-}
-
-fn green(text: impl AsRef<str>) -> String {
-    ansi("32", text.as_ref())
-}
-
-fn blue(text: impl AsRef<str>) -> String {
-    ansi("34", text.as_ref())
-}
-
-fn yellow(text: impl AsRef<str>) -> String {
-    ansi("33", text.as_ref())
-}
-
-fn magenta(text: impl AsRef<str>) -> String {
-    ansi("35", text.as_ref())
-}
-
-fn ansi(code: &str, text: impl AsRef<str>) -> String {
-    format!("\x1b[{code}m{}\x1b[0m", text.as_ref())
 }
 
 #[cfg(test)]
@@ -979,9 +768,7 @@ mod tests {
         }
         assert_eq!(
             resolve_style(" ACCELERANDO ", None, "anima", &[]),
-            Ok(ScreenStyle::Animation(AnimationStyle::Matrix(
-                MatrixVariant::Accelerando
-            )))
+            Ok(AnimationStyle::Matrix(MatrixVariant::Accelerando))
         );
         assert_eq!(
             build_animation(
@@ -999,7 +786,7 @@ mod tests {
         );
         assert_eq!(
             resolve_style(" AQUARIUM ", None, "anima", &[]),
-            Ok(ScreenStyle::Animation(AnimationStyle::Aquarium))
+            Ok(AnimationStyle::Aquarium)
         );
         assert_eq!(
             resolve_style(" ASCIIQUARIUM ", None, "anima", &[]),
@@ -1020,7 +807,7 @@ mod tests {
         );
         assert!(matches!(
             resolve_style(" PHYSARUM ", None, "anima", &[]),
-            Ok(ScreenStyle::Animation(AnimationStyle::Physarum))
+            Ok(AnimationStyle::Physarum)
         ));
         assert_eq!(
             build_animation(
@@ -1037,7 +824,7 @@ mod tests {
         );
         assert!(matches!(
             resolve_style(" CHLADNI ", None, "anima", &[]),
-            Ok(ScreenStyle::Animation(AnimationStyle::Chladni))
+            Ok(AnimationStyle::Chladni)
         ));
         assert_eq!(
             build_animation(
@@ -1057,7 +844,7 @@ mod tests {
         }
         assert!(matches!(
             resolve_style(" PLASMA ", None, "anima", &[]),
-            Ok(ScreenStyle::Animation(AnimationStyle::Plasma))
+            Ok(AnimationStyle::Plasma)
         ));
         assert_eq!(
             build_animation(
@@ -1074,15 +861,12 @@ mod tests {
         );
     }
 
-    // Defends: every current animation resolves from random; static never does.
+    // Defends: every current animation resolves from random.
     #[test]
     fn random_pool_resolves_current_animations_with_existing_alias_weight() {
         let mut native = Vec::new();
         for index in 0..SCREEN_RANDOM_STYLES.len() {
-            match resolve_style("random", Some(index), "anima", &[]).unwrap() {
-                ScreenStyle::Animation(style) => native.push(style),
-                _ => panic!("random selected a non-animation"),
-            }
+            native.push(resolve_style("random", Some(index), "anima", &[]).unwrap());
         }
         assert_eq!(native.len(), ANIMATION_STYLES.len() + 1);
         for style in ANIMATION_STYLES {
@@ -1121,12 +905,8 @@ mod tests {
             ]
         );
         for index in 0..SCREEN_RANDOM_STYLES.len() {
-            match resolve_style("random", Some(index), "anima", &parsed.excluded).unwrap() {
-                ScreenStyle::Animation(style) => {
-                    assert!(!parsed.excluded.contains(&style), "{style:?}")
-                }
-                _ => panic!("random selected a non-animation"),
-            }
+            let style = resolve_style("random", Some(index), "anima", &parsed.excluded).unwrap();
+            assert!(!parsed.excluded.contains(&style), "{style:?}");
         }
         assert_eq!(
             browse_style(classic, InputAction::Next, &parsed.excluded),
@@ -1253,11 +1033,7 @@ mod tests {
                     assert_eq!(parsed.symbols, symbols);
                     assert_eq!(parsed.big, big);
                     assert_eq!(parsed.bold, bold);
-                    let ScreenStyle::Animation(style) =
-                        resolve_style(&parsed.style, None, "anima", &[]).unwrap()
-                    else {
-                        panic!("expected animation")
-                    };
+                    let style = resolve_style(&parsed.style, None, "anima", &[]).unwrap();
                     for style in [
                         style,
                         browse_style(
@@ -1307,20 +1083,6 @@ mod tests {
                 }
             }
         }
-    }
-
-    // Defends: the static card copy matches the Yazelix welcome copy and omits the main-runtime trailing prompt.
-    #[test]
-    fn static_card_uses_yazelix_welcome_copy_without_extra_prompt() {
-        let frame = strip_ansi(&static_card(140).join("\n"));
-        assert!(frame.contains("YAZELIX"));
-        assert!(frame.contains("your reproducible, declarative terminal IDE"));
-        assert!(frame.contains("welcome to yazelix"));
-        assert!(!frame.contains("just"));
-
-        let narrow = static_card(20).join("\n");
-        assert!(narrow.contains(&blue("zellij")));
-        assert!(narrow.contains(&blue("helix")));
     }
 
     // Defends: Game of Life keeps the same minimum-width sizing contract as the integrated screen renderer.
