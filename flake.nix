@@ -3,8 +3,10 @@
 
   inputs = {
     kinestra.url = "github:Yazelix/kinestra";
-    recording-mars.url = "github:Yazelix/mars/21109e3ebc24b63da11bae644dfb9bab28ce0e18";
-    recording-mars.inputs.nixpkgs.url = "github:NixOS/nixpkgs/567a49d1913ce81ac6e9582e3553dd90a955875f";
+    nova-rio = {
+      url = "github:Yazelix/nova-rio/aead5c08d1d5b8396fedf1038b609144b93cbe4c";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     fenix = {
       url = "github:nix-community/fenix";
@@ -18,7 +20,7 @@
       nixpkgs,
       fenix,
       kinestra,
-      recording-mars,
+      nova-rio,
     }:
     let
       systems = [
@@ -115,6 +117,7 @@
       apps = forAllSystems (
         system:
         let
+          pkgs = nixpkgs.legacyPackages.${system};
           anima = {
             type = "app";
             program = "${self.packages.${system}.anima}/bin/anima";
@@ -133,8 +136,16 @@
                 recipe = ./demo/record.rs;
                 environment = {
                   ANIMA_BIN = "${self.packages.${system}.anima}/bin/anima";
-                  ANIMA_MARS = recording-mars.packages.${system}.mars;
-                  ANIMA_FONT = self.packages.${system}.accelerando-font;
+                  ANIMA_RIO = "${nova-rio.packages.${system}.nrio}/bin/nrio";
+                  ANIMA_RIO_CONFIG = pkgs.replaceVars ./demo/rio/config.toml {
+                    accelerandoDir = "${self.packages.${system}.accelerando-font}/share/fonts/truetype";
+                    jetbrainsMonoDir = "${pkgs.jetbrains-mono}/share/fonts/truetype";
+                    symbolsNerdDir = "${pkgs.nerd-fonts.symbols-only}/share/fonts/truetype/NerdFonts/Symbols";
+                    notoSymbolsDir = "${pkgs.noto-fonts}/share/fonts/noto";
+                    notoEmojiDir = "${pkgs.noto-fonts-color-emoji}/share/fonts/noto";
+                  };
+                  # Match Nova's Linux Rio wrapper so the private display finds Mesa's Vulkan drivers.
+                  VK_ADD_DRIVER_FILES = "${pkgs.mesa}/share/vulkan/icd.d";
                 };
               }
             }/bin/record-anima-demo";

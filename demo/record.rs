@@ -1,57 +1,63 @@
 use kinestra::{Error, Recorder, Result, Size};
 use std::{
     env, fs,
-    path::{Path, PathBuf},
-    process::{Command, ExitCode},
+    path::Path,
+    process::{Command, ExitCode, Stdio},
     time::Duration,
 };
 
 fn record(r: &mut Recorder) -> Result<()> {
     let root = env::current_dir()?;
     let demo = root.join("demo");
-    if !demo.join("mars/config.toml").is_file() {
+    if !demo.join("record.rs").is_file() {
         return Err(Error::Invalid(
             "run record-demo from the Anima repository root".into(),
         ));
     }
     let assets = root.join("assets");
     let gallery = assets.join("animations");
-    let mars = PathBuf::from(env::var_os("ANIMA_MARS").expect("Nix supplies ANIMA_MARS"));
+    let rio = env::var_os("ANIMA_RIO").expect("Nix supplies ANIMA_RIO");
     let anima = env::var_os("ANIMA_BIN").expect("Nix supplies ANIMA_BIN");
+    let config = fs::read_to_string(
+        env::var_os("ANIMA_RIO_CONFIG").expect("Nix supplies ANIMA_RIO_CONFIG"),
+    )?;
+    if config.matches("size = 14.0").count() != 1
+        || config.matches("family = \"JetBrains Mono\"").count() != 1
+    {
+        return Err(Error::Invalid(
+            "demo/rio/config.toml must set one 14.0 JetBrains Mono font for the Accelerando override".into(),
+        ));
+    }
     let work = r.work().to_path_buf();
-    let base = work.join("mars-base");
-    fs::create_dir_all(&base)?;
-    for entry in fs::read_dir(mars.join("share/mars"))? {
-        let entry = entry?;
-        if entry.file_name() != "config.toml" {
-            std::os::unix::fs::symlink(entry.path(), base.join(entry.file_name()))?;
+    let small_font = work.join("rio");
+    let large_font = work.join("rio-accelerando");
+    for (home, text) in [
+        (&small_font, config.clone()),
+        (
+            &large_font,
+            config.replace("size = 14.0", "size = 28.0").replace(
+                "family = \"JetBrains Mono\"",
+                "family = \"Accelerando Terminal\"",
+            ),
+        ),
+    ] {
+        fs::create_dir_all(home)?;
+        let path = home.join("config.toml");
+        fs::write(&path, text)?;
+        // A rejected config would otherwise fall back to defaults and record a misconfigured terminal.
+        let check = Command::new(&rio)
+            .arg("--config-editor")
+            .stdin(fs::File::open(&path)?)
+            .stdout(Stdio::null())
+            .output()?;
+        if !check.status.success() {
+            return Err(Error::Invalid(format!(
+                "Nova Rio rejected {}: {}",
+                path.display(),
+                String::from_utf8_lossy(&check.stderr).trim()
+            )));
         }
     }
-    let font = PathBuf::from(env::var_os("ANIMA_FONT").expect("Nix supplies ANIMA_FONT"));
-    let base_config = fs::read_to_string(mars.join("share/mars/config.toml"))?;
-    assert!(base_config.contains("additional-dirs = [") && base_config.contains("symbol-map = ["));
-    fs::write(
-        base.join("config.toml"),
-        base_config.replace(
-            "additional-dirs = [",
-            &format!("additional-dirs = [\"{}/share/fonts/truetype\",", font.display()),
-        ).replace(
-            "symbol-map = [",
-            "symbol-map = [{ start = \"100000\", end = \"102000\", font-family = \"Accelerando Terminal\" },",
-        ),
-    )?;
-    let large_font = work.join("mars-accelerando");
-    fs::create_dir_all(&large_font)?;
-    let config = fs::read_to_string(demo.join("mars/config.toml"))?;
-    assert_eq!(config.matches("size = 14.0").count(), 1);
-    assert!(config.contains("family = \"JetBrains Mono\""));
-    fs::write(
-        large_font.join("config.toml"),
-        config.replace("size = 14.0", "size = 28.0").replace(
-            "family = \"JetBrains Mono\"",
-            "family = \"Accelerando Terminal\"\nsymbol-map = []",
-        ),
-    )?;
     let recordings = demo.join(".work");
     fs::create_dir_all(&gallery)?;
     fs::create_dir_all(&recordings)?;
@@ -91,24 +97,19 @@ fn record(r: &mut Recorder) -> Result<()> {
         let accelerando = style == "accelerando";
         r.launch(
             "anima-demo",
-            Command::new(mars.join("bin/mars"))
-                .args(["-e"])
+            Command::new(&rio)
+                .args(["--app-id", "anima-demo", "-e"])
                 .arg(&anima)
                 .arg(style)
                 .args(if accelerando { &["--bold"][..] } else { &[] })
                 .env(
-                    "MARS_CONFIG_HOME",
+                    "NRIO_CONFIG_HOME",
                     if accelerando {
-                        large_font.clone()
+                        &large_font
                     } else {
-                        demo.join("mars")
+                        &small_font
                     },
-                )
-                .env("MARS_APP_ID", "anima-demo")
-                .env("MARS_BASE_CONFIG_HOME", &base)
-                .env("YAZELIX_CONFIG_HOME", work.join("config"))
-                .env_remove("YAZELIX_CURSOR_CONFIG")
-                .env_remove("MARS_PROFILE"),
+                ),
         )?;
         r.sleep(Duration::from_secs(warmup))?;
         let recording = recordings.join(format!("{style}.mp4"));

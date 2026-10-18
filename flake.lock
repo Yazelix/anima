@@ -104,41 +104,27 @@
         "type": "github"
       }
     },
-    "nixpkgs_3": {
-      "locked": {
-        "lastModified": 1781577229,
-        "narHash": "sha256-lrp67w8AulE9Ks53n27I45ADSzbOCn4H+CNW1Ck8B+8=",
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
-        "type": "github"
-      },
-      "original": {
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
-        "type": "github"
-      }
-    },
-    "recording-mars": {
+    "nova-rio": {
       "inputs": {
         "flake-parts": "flake-parts",
-        "nixpkgs": "nixpkgs_3",
+        "nixpkgs": [
+          "nixpkgs"
+        ],
         "rust-overlay": "rust-overlay",
         "systems": "systems"
       },
       "locked": {
-        "lastModified": 1786291144,
-        "narHash": "sha256-F6wT7v1mpq6t4ADAh2aPfbTGuFZxhQ73w8BgIb8lt+E=",
+        "lastModified": 1791591004,
+        "narHash": "sha256-HWbp/93Iz2XnXu3BiuB2uTCZWBZvxVGmrN5DQ508sFQ=",
         "owner": "Yazelix",
-        "repo": "mars",
-        "rev": "21109e3ebc24b63da11bae644dfb9bab28ce0e18",
+        "repo": "nova-rio",
+        "rev": "aead5c08d1d5b8396fedf1038b609144b93cbe4c",
         "type": "github"
       },
       "original": {
         "owner": "Yazelix",
-        "repo": "mars",
-        "rev": "21109e3ebc24b63da11bae644dfb9bab28ce0e18",
+        "repo": "nova-rio",
+        "rev": "aead5c08d1d5b8396fedf1038b609144b93cbe4c",
         "type": "github"
       }
     },
@@ -147,7 +133,7 @@
         "fenix": "fenix",
         "kinestra": "kinestra",
         "nixpkgs": "nixpkgs_2",
-        "recording-mars": "recording-mars"
+        "nova-rio": "nova-rio"
       }
     },
     "rust-analyzer-src": {
@@ -170,7 +156,7 @@
     "rust-overlay": {
       "inputs": {
         "nixpkgs": [
-          "recording-mars",
+          "nova-rio",
           "nixpkgs"
         ]
       },

@@ -382,7 +382,7 @@ v0.2.0
 ## Verification
 
 The gallery and hero montage are recorded from the local `anima` package through
-[Kinestra](https://github.com/Yazelix/kinestra) and a pinned Mars terminal:
+[Kinestra](https://github.com/Yazelix/kinestra) and a pinned Nova Rio terminal:
 
 ```sh
 nix run .#record-demo
@@ -399,16 +399,17 @@ Live recordings vary between takes.
 The eight-second hero montage reuses two seconds each of Primordial, Mandelbrot,
 Matrix, and tumblers. [A still preview](assets/anima-poster.png) is also available.
 
-The Rust recipe is [demo/record.rs](demo/record.rs); appearance settings live in
-`demo/mars/`. It checks its inventory against packaged CLI help and prints each
-GIF's byte size and the gallery total. When adding an animation, update the
-recipe and gallery together, inspect the motion and framing, and review asset
-sizes before committing. `boids` shares the predator GIF; `static` and `random`
+The Rust recipe is [demo/record.rs](demo/record.rs); the complete Nova Rio
+configuration is [demo/rio/config.toml](demo/rio/config.toml), and the recipe
+stops if Nova Rio rejects it. It checks its inventory against packaged CLI help
+and prints each GIF's byte size and the gallery total. When adding an animation,
+update the recipe and gallery together, inspect the motion and framing, and
+review asset sizes before committing. `boids` shares the predator GIF; `static` and `random`
 do not need separate previews.
 
 Nix compiles the recipe against the pinned Kinestra library. Intermediate MP4s
 stay in ignored `demo/.work/`. Recording tools and gallery assets stay outside
-the installed `anima` closure. Kinestra and Mars revisions are pinned in `flake.lock`.
+the installed `anima` closure. Kinestra and Nova Rio revisions are pinned in `flake.lock`.
 
 From this repository:
 
