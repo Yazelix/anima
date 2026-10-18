@@ -251,6 +251,9 @@ Random chooses from all current native animations, including Aquarium,
 remains explicitly selectable but outside that pool. The library random helper
 includes all native animation families with equal family weighting.
 `matrix` and `accelerando` share the Matrix family in that helper.
+`--exclude STYLE` removes an animation from CLI random selection and arrow
+browsing; repeat it to exclude more. A terminal without the Accelerando font can
+pass `--exclude accelerando`. An explicitly named style still plays.
 
 In `accelerando`, Accelerando-8192 alien glyphs fall in long green trails with
 white heads and varied speeds. The default uses only the alien alphabet;

@@ -112,6 +112,7 @@ struct ScreenArgs {
     big: bool,
     bold: bool,
     duration: Option<Duration>,
+    excluded: Vec<AnimationStyle>,
     help: bool,
 }
 
@@ -163,7 +164,7 @@ pub fn run_screen_cli(
         return Ok(());
     }
 
-    match resolve_style(&parsed.style, None, command_name)? {
+    match resolve_style(&parsed.style, None, command_name, &parsed.excluded)? {
         ScreenStyle::Static => run_in_screen_mode(|| run_static(parsed.duration)),
         ScreenStyle::Animation(style) => {
             let timing = parsed.duration.map(|duration| (Instant::now(), duration));
@@ -175,6 +176,7 @@ pub fn run_screen_cli(
                     parsed.symbols,
                     parsed.big,
                     parsed.bold,
+                    &parsed.excluded,
                     timing,
                 )
             })
@@ -199,6 +201,7 @@ fn parse_screen_args(
     let mut big = false;
     let mut bold = false;
     let mut duration = None;
+    let mut excluded = Vec::new();
     let mut iter = args.into_iter();
 
     while let Some(arg) = iter.next() {
@@ -232,6 +235,23 @@ fn parse_screen_args(
                 }
                 duration = Some(Duration::from_secs(seconds));
             }
+            "--exclude" => {
+                let Some(raw) = iter.next() else {
+                    return Err("missing value after --exclude".into());
+                };
+                match resolve_style(&raw, None, command_name, &[]) {
+                    Ok(ScreenStyle::Animation(style))
+                        if !raw.trim().eq_ignore_ascii_case("random") =>
+                    {
+                        excluded.push(style)
+                    }
+                    _ => {
+                        return Err(format!(
+                            "invalid --exclude value `{raw}`. Expected an animation style"
+                        ));
+                    }
+                }
+            }
             other if style.is_none() => style = Some(other.to_string()),
             other => {
                 return Err(format!(
@@ -248,13 +268,14 @@ fn parse_screen_args(
         big,
         bold,
         duration,
+        excluded,
         help,
     })
 }
 
 fn print_screen_help(command_name: &str) -> Result<(), String> {
     let help = format!(
-        "Show Yazelix terminal screen animations\n\nUsage:\n  {command_name} [STYLE] [--big] [--bold] [--symbols] [--cell-style full_block|dotted] [--duration-seconds N]\n\nStyles:\n  {}\n  random\n\nNotes:\n  accelerando uses only alien glyphs by default; --symbols mixes in letters, digits and punctuation\n  --big draws accelerando as large solid-block glyphs without changing terminal font size\n  --bold requests bold accelerando text at either size\n  normal accelerando requires the Accelerando Terminal font (bundled in Eon)\n  asciiquarium is a compatibility alias for native aquarium (not the classic renderer)\n  Animations, including Aquarium: Left/h/p = previous; Right/l/n = next; any other key = exit\n  Static: any key = exit\n",
+        "Show Yazelix terminal screen animations\n\nUsage:\n  {command_name} [STYLE] [--big] [--bold] [--symbols] [--cell-style full_block|dotted] [--duration-seconds N] [--exclude STYLE]...\n\nStyles:\n  {}\n  random\n\nNotes:\n  accelerando uses only alien glyphs by default; --symbols mixes in letters, digits and punctuation\n  --big draws accelerando as large solid-block glyphs without changing terminal font size\n  --bold requests bold accelerando text at either size\n  normal accelerando requires the Accelerando Terminal font (bundled in Eon)\n  --exclude removes an animation from random selection and browsing; repeat it for more\n  asciiquarium is a compatibility alias for native aquarium (not the classic renderer)\n  Animations, including Aquarium: Left/h/p = previous; Right/l/n = next; any other key = exit\n  Static: any key = exit\n",
         SCREEN_STYLES.join("\n  ")
     );
     let stdout = io::stdout();
@@ -269,10 +290,13 @@ fn resolve_style(
     raw: &str,
     random_index: Option<usize>,
     command_name: &str,
+    excluded: &[AnimationStyle],
 ) -> Result<ScreenStyle, String> {
     let normalized = raw.trim().to_ascii_lowercase();
     if normalized == "random" {
-        return resolve_style(random_screen_style(random_index), None, command_name);
+        let style = random_screen_style(random_index, excluded)
+            .ok_or("--exclude removed every random animation")?;
+        return resolve_style(style, None, command_name, &[]);
     }
     if normalized == STATIC_STYLE {
         return Ok(ScreenStyle::Static);
@@ -324,9 +348,20 @@ fn resolve_style(
     ))
 }
 
-fn random_screen_style(random_index: Option<usize>) -> &'static str {
-    let index = random_index.unwrap_or_else(|| system_random_index(SCREEN_RANDOM_STYLES.len()));
-    SCREEN_RANDOM_STYLES[index % SCREEN_RANDOM_STYLES.len()]
+fn random_screen_style(
+    random_index: Option<usize>,
+    excluded: &[AnimationStyle],
+) -> Option<&'static str> {
+    let pool: Vec<_> = SCREEN_RANDOM_STYLES
+        .iter()
+        .copied()
+        .filter(|style| {
+            !matches!(resolve_style(style, None, "", &[]),
+                Ok(ScreenStyle::Animation(style)) if excluded.contains(&style))
+        })
+        .collect();
+    let index = random_index.unwrap_or_else(|| system_random_index(pool.len()));
+    pool.get(index % pool.len().max(1)).copied()
 }
 
 fn remaining(timing: Option<(Instant, Duration)>) -> Option<Duration> {
@@ -367,6 +402,7 @@ fn run_animation(
     symbols: bool,
     big: bool,
     bold: bool,
+    excluded: &[AnimationStyle],
     timing: Option<(Instant, Duration)>,
 ) -> Result<(), String> {
     let mut width = terminal_width();
@@ -412,7 +448,7 @@ fn run_animation(
         match action {
             Some(InputAction::Exit) => return Ok(()),
             Some(action @ (InputAction::Previous | InputAction::Next)) => {
-                style = browse_style(style, action);
+                style = browse_style(style, action, excluded);
                 (width, height) = current;
                 animation = build_animation(style, width, height, cell_style, symbols, big, bold);
                 cadence = frame_delay(style);
@@ -641,7 +677,11 @@ fn frame_delay(style: AnimationStyle) -> Duration {
     }
 }
 
-fn browse_style(style: AnimationStyle, action: InputAction) -> AnimationStyle {
+fn browse_style(
+    style: AnimationStyle,
+    action: InputAction,
+    excluded: &[AnimationStyle],
+) -> AnimationStyle {
     let count = ANIMATION_STYLES.len();
     let offset = match action {
         InputAction::Previous => count - 1,
@@ -652,7 +692,10 @@ fn browse_style(style: AnimationStyle, action: InputAction) -> AnimationStyle {
         .iter()
         .position(|candidate| *candidate == style)
         .expect("native style is browsable");
-    ANIMATION_STYLES[(index + offset) % count]
+    (1..=count)
+        .map(|step| ANIMATION_STYLES[(index + offset * step) % count])
+        .find(|candidate| !excluded.contains(candidate))
+        .unwrap_or(style)
 }
 
 fn key_action(key: KeyEvent) -> Option<InputAction> {
@@ -932,10 +975,10 @@ mod tests {
     #[test]
     fn supported_styles_resolve() {
         for style in SCREEN_STYLES {
-            assert!(resolve_style(style, None, "anima").is_ok());
+            assert!(resolve_style(style, None, "anima", &[]).is_ok());
         }
         assert_eq!(
-            resolve_style(" ACCELERANDO ", None, "anima"),
+            resolve_style(" ACCELERANDO ", None, "anima", &[]),
             Ok(ScreenStyle::Animation(AnimationStyle::Matrix(
                 MatrixVariant::Accelerando
             )))
@@ -955,12 +998,12 @@ mod tests {
                 .render_frame()
         );
         assert_eq!(
-            resolve_style(" AQUARIUM ", None, "anima"),
+            resolve_style(" AQUARIUM ", None, "anima", &[]),
             Ok(ScreenStyle::Animation(AnimationStyle::Aquarium))
         );
         assert_eq!(
-            resolve_style(" ASCIIQUARIUM ", None, "anima"),
-            resolve_style(AQUARIUM_STYLE, None, "anima")
+            resolve_style(" ASCIIQUARIUM ", None, "anima", &[]),
+            resolve_style(AQUARIUM_STYLE, None, "anima", &[])
         );
         assert_eq!(
             build_animation(
@@ -976,7 +1019,7 @@ mod tests {
             AquariumAnimation::new(full_screen_context(40, 12)).render_frame()
         );
         assert!(matches!(
-            resolve_style(" PHYSARUM ", None, "anima"),
+            resolve_style(" PHYSARUM ", None, "anima", &[]),
             Ok(ScreenStyle::Animation(AnimationStyle::Physarum))
         ));
         assert_eq!(
@@ -993,7 +1036,7 @@ mod tests {
             PhysarumAnimation::new(full_screen_context(40, 12)).render_frame()
         );
         assert!(matches!(
-            resolve_style(" CHLADNI ", None, "anima"),
+            resolve_style(" CHLADNI ", None, "anima", &[]),
             Ok(ScreenStyle::Animation(AnimationStyle::Chladni))
         ));
         assert_eq!(
@@ -1010,10 +1053,10 @@ mod tests {
             ChladniAnimation::new(full_screen_context(40, 12)).render_frame()
         );
         for style in ["game_of_life_oscillators", "game_of_life_bloom"] {
-            assert!(resolve_style(style, None, "anima").is_err());
+            assert!(resolve_style(style, None, "anima", &[]).is_err());
         }
         assert!(matches!(
-            resolve_style(" PLASMA ", None, "anima"),
+            resolve_style(" PLASMA ", None, "anima", &[]),
             Ok(ScreenStyle::Animation(AnimationStyle::Plasma))
         ));
         assert_eq!(
@@ -1036,7 +1079,7 @@ mod tests {
     fn random_pool_resolves_current_animations_with_existing_alias_weight() {
         let mut native = Vec::new();
         for index in 0..SCREEN_RANDOM_STYLES.len() {
-            match resolve_style("random", Some(index), "anima").unwrap() {
+            match resolve_style("random", Some(index), "anima", &[]).unwrap() {
                 ScreenStyle::Animation(style) => native.push(style),
                 _ => panic!("random selected a non-animation"),
             }
@@ -1057,6 +1100,58 @@ mod tests {
                 weight,
                 "{style:?}"
             );
+        }
+    }
+
+    // Defends: an integrator can keep a style its terminal cannot render out of random and browsing.
+    #[test]
+    fn exclude_removes_styles_from_random_selection_and_browsing() {
+        let parsed = parse_screen_args(
+            ["--exclude", " ACCELERANDO ", "--exclude", "boids"].map(String::from),
+            "anima",
+        )
+        .unwrap();
+        let classic = AnimationStyle::Matrix(MatrixVariant::Classic);
+        let gliders = AnimationStyle::GameOfLife(GAME_OF_LIFE_RANDOM_STYLES[0]);
+        assert_eq!(
+            parsed.excluded,
+            [
+                AnimationStyle::Matrix(MatrixVariant::Accelerando),
+                AnimationStyle::Boids(BoidsVariant::Predator),
+            ]
+        );
+        for index in 0..SCREEN_RANDOM_STYLES.len() {
+            match resolve_style("random", Some(index), "anima", &parsed.excluded).unwrap() {
+                ScreenStyle::Animation(style) => {
+                    assert!(!parsed.excluded.contains(&style), "{style:?}")
+                }
+                _ => panic!("random selected a non-animation"),
+            }
+        }
+        assert_eq!(
+            browse_style(classic, InputAction::Next, &parsed.excluded),
+            gliders
+        );
+        assert_eq!(
+            browse_style(gliders, InputAction::Previous, &parsed.excluded),
+            classic
+        );
+        assert_eq!(
+            browse_style(
+                AnimationStyle::Aquarium,
+                InputAction::Next,
+                &parsed.excluded
+            ),
+            AnimationStyle::Boids(BoidsVariant::Schools)
+        );
+        assert!(resolve_style("random", None, "anima", ANIMATION_STYLES).is_err());
+        for args in [
+            &["--exclude"][..],
+            &["--exclude", "random"],
+            &["--exclude", "static"],
+            &["--exclude", "logo"],
+        ] {
+            assert!(parse_screen_args(args.iter().map(|arg| arg.to_string()), "anima").is_err());
         }
     }
 
@@ -1107,14 +1202,14 @@ mod tests {
         for index in 0..cycle.len() {
             let current = cycle[index];
             assert_eq!(
-                browse_style(current, InputAction::Next),
+                browse_style(current, InputAction::Next, &[]),
                 cycle[(index + 1) % cycle.len()]
             );
             assert_eq!(
-                browse_style(current, InputAction::Previous),
+                browse_style(current, InputAction::Previous, &[]),
                 cycle[(index + cycle.len() - 1) % cycle.len()]
             );
-            assert_eq!(browse_style(current, InputAction::Exit), current);
+            assert_eq!(browse_style(current, InputAction::Exit, &[]), current);
         }
     }
 
@@ -1159,15 +1254,16 @@ mod tests {
                     assert_eq!(parsed.big, big);
                     assert_eq!(parsed.bold, bold);
                     let ScreenStyle::Animation(style) =
-                        resolve_style(&parsed.style, None, "anima").unwrap()
+                        resolve_style(&parsed.style, None, "anima", &[]).unwrap()
                     else {
                         panic!("expected animation")
                     };
                     for style in [
                         style,
                         browse_style(
-                            browse_style(style, InputAction::Previous),
+                            browse_style(style, InputAction::Previous, &[]),
                             InputAction::Next,
+                            &[],
                         ),
                     ] {
                         let frame = build_animation(
